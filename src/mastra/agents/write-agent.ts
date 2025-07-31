@@ -1,6 +1,7 @@
 import { openai } from "@ai-sdk/openai";
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
+import { recordDailyWorkTool } from "../tools";
 
 const writeAgentInstructions = `
 あなたは個別農場特化型の経験蓄積・記録エージェント（WriteAgent）です。
@@ -52,10 +53,8 @@ export const writeAgent = new Agent({
   model: openai("gpt-4o"),
   
   tools: {
-    // createTaskRecord: createTaskRecordTool,
-    // updateTaskStatus: updateTaskStatusTool, 
-    // createWorkflow: createWorkflowTool,
-    // recordFieldWork: recordFieldWorkTool,
+    // 日々の作業記録・経験蓄積
+    recordDailyWork: recordDailyWorkTool,
   },
 });
 
