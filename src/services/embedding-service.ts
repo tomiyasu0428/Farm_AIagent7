@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { EmbeddingOptions, EmbeddingResult, TaskType, EmbeddingDimensions } from '../types';
 
 /**
  * Gemini Embeddings APIサービス
@@ -28,8 +29,8 @@ export class EmbeddingService {
    */
   async generateEmbedding(
     text: string, 
-    outputDimensionality: 768 | 1536 | 3072 = 1536,
-    taskType: 'RETRIEVAL_QUERY' | 'RETRIEVAL_DOCUMENT' | 'SEMANTIC_SIMILARITY' | 'CLASSIFICATION' | 'CLUSTERING' = 'RETRIEVAL_DOCUMENT'
+    outputDimensionality: EmbeddingDimensions = 1536,
+    taskType: TaskType = 'RETRIEVAL_DOCUMENT'
   ): Promise<number[]> {
     try {
       console.log(`🔄 Generating embedding for text: "${text.substring(0, 50)}..." (${taskType})`);
@@ -78,8 +79,8 @@ export class EmbeddingService {
    */
   async generateBatchEmbeddings(
     texts: string[], 
-    outputDimensionality: 768 | 1536 | 3072 = 1536,
-    taskType: 'RETRIEVAL_QUERY' | 'RETRIEVAL_DOCUMENT' | 'SEMANTIC_SIMILARITY' | 'CLASSIFICATION' | 'CLUSTERING' = 'RETRIEVAL_DOCUMENT'
+    outputDimensionality: EmbeddingDimensions = 1536,
+    taskType: TaskType = 'RETRIEVAL_DOCUMENT'
   ): Promise<number[][]> {
     console.log(`🔄 Generating batch embeddings for ${texts.length} texts (${taskType})`);
     

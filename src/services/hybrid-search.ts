@@ -1,6 +1,7 @@
 import { getMongoClient } from '../database/mongodb-client';
-import { DailyWorkDocument, PersonalKnowledgeDocument } from '../database/mongodb-client';
+import { DailyWorkDocument, PersonalKnowledgeDocument, HybridSearchParams, PersonalKnowledgeSearchParams, SearchResult, PersonalKnowledgeSearchResult } from '../types';
 import { getEmbeddingService, EmbeddingService } from './embedding-service';
+import { AppConfig } from '../config';
 
 /**
  * ハイブリッド検索サービス
@@ -13,28 +14,14 @@ export class HybridSearchService {
   /**
    * 作業記録のハイブリッド検索
    */
-  async searchDailyRecords(params: {
-    userId: string;
-    query: string;
-    fieldId?: string;
-    workType?: string;
-    dateRange?: { start: Date; end: Date };
-    limit?: number;
-  }): Promise<{
-    records: DailyWorkDocument[];
-    searchMetadata: {
-      totalFound: number;
-      searchMethod: 'keyword' | 'vector' | 'hybrid';
-      relevanceScores?: number[];
-    };
-  }> {
-    const { userId, query, fieldId, workType, dateRange, limit = 10 } = params;
+  async searchDailyRecords(params: HybridSearchParams): Promise<SearchResult<DailyWorkDocument>> {
+    const { userId, query, fieldId, workType, dateRange, limit = AppConfig.SEARCH.DEFAULT_LIMIT } = params;
     
     try {
-      const collection = this.mongoClient.getCollection<DailyWorkDocument>('dailyWork');
+      const collection = this.mongoClient.getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
       
       // 基本フィルター条件
-      const baseFilter: any = { userId };
+      const baseFilter: Record<string, unknown> = { userId };
       if (fieldId) baseFilter.fieldId = fieldId;
       if (workType) baseFilter.workType = workType;
       if (dateRange) {
@@ -66,7 +53,7 @@ export class HybridSearchService {
 
       if (vectorResults.length > 0 && keywordResults.length > 0) {
         // ハイブリッド：両方の結果をRRFで統合
-        results = this.fuseResults(keywordResults, vectorResults, 60).slice(0, limit);
+        results = this.fuseResults(keywordResults, vectorResults, AppConfig.SEARCH.RRF_K).slice(0, limit);
         searchMethod = 'hybrid';
       } else if (vectorResults.length > 0) {
         // ベクトル検索のみ
@@ -95,27 +82,13 @@ export class HybridSearchService {
   /**
    * 個別農場知識のハイブリッド検索
    */
-  async searchPersonalKnowledge(params: {
-    userId: string;
-    farmId: string;
-    query: string;
-    category?: string;
-    minConfidence?: number;
-    limit?: number;
-  }): Promise<{
-    knowledge: PersonalKnowledgeDocument[];
-    searchMetadata: {
-      totalFound: number;
-      avgConfidence: number;
-      categories: string[];
-    };
-  }> {
-    const { userId, farmId, query, category, minConfidence = 0.5, limit = 5 } = params;
+  async searchPersonalKnowledge(params: PersonalKnowledgeSearchParams): Promise<PersonalKnowledgeSearchResult> {
+    const { userId, farmId, query, category, minConfidence = AppConfig.SEARCH.MIN_CONFIDENCE, limit = 5 } = params;
     
     try {
-      const collection = this.mongoClient.getCollection<PersonalKnowledgeDocument>('personalKnowledge');
+      const collection = this.mongoClient.getCollection<PersonalKnowledgeDocument>(AppConfig.DATABASE.COLLECTIONS.PERSONAL_KNOWLEDGE);
       
-      const filter: any = { 
+      const filter: Record<string, unknown> = { 
         farmId, 
         userId,
         confidence: { $gte: minConfidence }
@@ -157,10 +130,10 @@ export class HybridSearchService {
   /**
    * Reciprocal Rank Fusion (RRF)による結果統合
    */
-  private fuseResults<T extends { _id?: any }>(
+  private fuseResults<T extends { _id?: unknown }>(
     keywordResults: T[],
     vectorResults: T[],
-    k: number = 60
+    k: number = AppConfig.SEARCH.RRF_K
   ): T[] {
     // 各結果にスコアを付与
     const keywordScores = new Map<string, number>();
@@ -210,7 +183,7 @@ export class HybridSearchService {
    */
   private async vectorSearchDailyWork(
     query: string, 
-    baseFilter: any, 
+    baseFilter: Record<string, unknown>, 
     limit: number
   ): Promise<DailyWorkDocument[]> {
     try {
@@ -218,21 +191,21 @@ export class HybridSearchService {
       const optimizedQuery = EmbeddingService.optimizeTextForEmbedding(query);
       const queryVector = await this.embeddingService.generateEmbedding(
         optimizedQuery, 
-        1536, 
+        AppConfig.EMBEDDING.DEFAULT_DIMENSIONS, 
         'RETRIEVAL_QUERY'
       );
 
-      const collection = this.mongoClient.getCollection<DailyWorkDocument>('dailyWork');
+      const collection = this.mongoClient.getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
 
       // MongoDB Atlas Vector Search
       // 注意: Atlas Vector Searchインデックスが設定されている必要があります
       const vectorResults = await collection.aggregate([
         {
           $vectorSearch: {
-            index: "dailyWork_vector_index", // Atlas UIで作成するインデックス名
+            index: AppConfig.DATABASE.INDEXES.VECTOR_SEARCH.DAILY_WORK,
             path: "embedding",
             queryVector: queryVector,
-            numCandidates: limit * 5,
+            numCandidates: Math.min(limit * AppConfig.SEARCH.VECTOR_SEARCH.NUM_CANDIDATES_MULTIPLIER, AppConfig.SEARCH.VECTOR_SEARCH.MAX_NUM_CANDIDATES),
             limit: limit,
             filter: baseFilter
           }
@@ -256,7 +229,11 @@ export class HybridSearchService {
    * クエリからベクトル埋め込みを生成
    */
   private async generateEmbedding(text: string): Promise<number[]> {
-    return await this.embeddingService.generateEmbedding(text, 1536, 'RETRIEVAL_QUERY');
+    return await this.embeddingService.generateEmbedding(
+      text, 
+      AppConfig.EMBEDDING.DEFAULT_DIMENSIONS, 
+      'RETRIEVAL_QUERY'
+    );
   }
 
   /**
@@ -270,7 +247,7 @@ export class HybridSearchService {
     const { userId, referenceRecordId, limit = 3 } = params;
     
     try {
-      const collection = this.mongoClient.getCollection<DailyWorkDocument>('dailyWork');
+      const collection = this.mongoClient.getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
       
       // 参照記録を取得
       const referenceRecord = await collection.findOne({ 

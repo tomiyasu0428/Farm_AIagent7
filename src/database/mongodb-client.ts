@@ -1,4 +1,10 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Db, Collection, Document } from 'mongodb';
+import { 
+  DailyWorkDocument, 
+  PersonalKnowledgeDocument, 
+  BaseDocument 
+} from '../types';
+import { AppConfig } from '../config';
 
 /**
  * MongoDB接続とコレクション管理クラス
@@ -54,7 +60,7 @@ export class MongoDBClient {
   /**
    * コレクション取得
    */
-  getCollection<T = any>(name: string): Collection<T> {
+  getCollection<T extends Document>(name: string): Collection<T> {
     if (!this.db || !this.connected) {
       throw new Error('Database not connected. Call connect() first.');
     }
@@ -70,19 +76,32 @@ export class MongoDBClient {
 
   /**
    * 機密情報をマスクしたエラーメッセージ
+   * セキュリティ強化: 完全な機密情報のサニタイズ
    */
-  private sanitizeError(error: any): string {
-    if (error && error.message) {
-      return error.message.replace(/\/\/.*:.*@/g, '//***:***@');
+  private sanitizeError(error: unknown): string {
+    if (error && typeof error === 'object' && 'message' in error) {
+      const message = String((error as Error).message);
+      return message
+        .replace(/mongodb\+srv:\/\/[^@]+@/gi, 'mongodb+srv://***:***@')
+        .replace(/\/\/[^@]+@/g, '//***:***@')
+        .replace(/password[=:][^&\s]+/gi, 'password=***')
+        .replace(/key[=:][^&\s]+/gi, 'key=***')
+        .replace(/token[=:][^&\s]+/gi, 'token=***')
+        .replace(/secret[=:][^&\s]+/gi, 'secret=***')
+        .replace(/credential[=:][^&\s]+/gi, 'credential=***');
     }
-    return String(error);
+    return 'Database operation failed';
   }
 
   /**
    * 接続文字列から機密情報を削除
+   * セキュリティ強化: より安全なマスキング
    */
   private sanitizeConnectionString(connectionString: string): string {
-    return connectionString.replace(/\/\/.*:.*@/g, '//***:***@');
+    return connectionString
+      .replace(/mongodb\+srv:\/\/[^@]+@/gi, 'mongodb+srv://***:***@')
+      .replace(/\/\/[^@]+@/g, '//***:***@')
+      .replace(/[?&](password|pwd|key|token|secret)=[^&]*/gi, '$1=***');
   }
 
   /**
@@ -104,20 +123,17 @@ export class MongoDBClient {
 }
 
 /**
- * データベース型定義
+ * 追加的なデータベース型定義
+ * （主要な型は src/types/index.ts で定義）
  */
-export interface UserDocument {
-  _id?: string;
+export interface UserDocument extends BaseDocument {
   lineUserId: string;
   name: string;
   farmId: string;
-  preferences: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
+  preferences: Record<string, unknown>;
 }
 
-export interface FarmDocument {
-  _id?: string;
+export interface FarmDocument extends BaseDocument {
   farmId: string;
   farmName: string;
   address: string;
@@ -126,13 +142,10 @@ export interface FarmDocument {
     contact?: string;
   };
   climateZone: string;
-  soilConditions: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
+  soilConditions: Record<string, unknown>;
 }
 
-export interface FieldDocument {
-  _id?: string;
+export interface FieldDocument extends BaseDocument {
   fieldId: string;
   fieldName: string;
   farmId: string;
@@ -160,67 +173,9 @@ export interface FieldDocument {
     yield?: number;
     notes?: string;
   }>;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
-export interface DailyWorkDocument {
-  _id?: string;
-  recordId: string;
-  userId: string;
-  fieldId: string;
-  date: Date;
-  workType: string;
-  description: string;
-  materials?: Array<{
-    name: string;
-    amount: string;
-    unit: string;
-  }>;
-  weather?: {
-    condition: string;
-    temperature?: number;
-    humidity?: number;
-  };
-  duration?: number; // 分
-  workers: number;
-  equipment?: string[];
-  notes?: string;
-  result: {
-    quality: 'excellent' | 'good' | 'fair' | 'poor';
-    effectiveness?: 'high' | 'medium' | 'low';
-    issues?: string[];
-    improvements?: string[];
-    satisfaction?: number; // 1-5
-  };
-  followUpNeeded: boolean;
-  nextActions?: string[];
-  // ベクトル検索用
-  textContent: string; // 検索対象テキスト
-  embedding?: number[]; // ベクトル表現
-  tags: string[]; // 検索タグ
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface PersonalKnowledgeDocument {
-  _id?: string;
-  knowledgeId: string;
-  farmId: string;
-  userId: string;
-  title: string;
-  content: string;
-  category: string; // 'experience', 'method', 'observation', 'lesson'
-  relatedRecords: string[]; // 関連するDailyWorkのrecordId
-  confidence: number; // 確信度 0-1
-  frequency: number; // 使用頻度
-  // ベクトル検索用
-  embedding?: number[];
-  tags: string[];
-  lastUsed: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// DailyWorkDocument と PersonalKnowledgeDocument は src/types/index.ts からインポート
 
 // シングルトンインスタンス
 let mongoClient: MongoDBClient | null = null;
@@ -230,9 +185,8 @@ let mongoClient: MongoDBClient | null = null;
  */
 export function getMongoClient(): MongoDBClient {
   if (!mongoClient) {
-    const connectionString = process.env.MONGODB_URI || 'mongodb://localhost:27017';
-    const dbName = process.env.MONGODB_DATABASE || process.env.MONGODB_DB_NAME || 'agri_assistant';
-    mongoClient = new MongoDBClient(connectionString, dbName);
+    const config = AppConfig.getDatabaseConfig();
+    mongoClient = new MongoDBClient(config.uri, config.dbName);
   }
   return mongoClient;
 }
@@ -256,7 +210,7 @@ export async function initializeDatabase(): Promise<void> {
     textContent: 'text', 
     description: 'text', 
     notes: 'text' 
-  });
+  }, { name: AppConfig.DATABASE.INDEXES.TEXT_SEARCH.DAILY_WORK });
 
   // ベクトル検索用インデックス（Atlas Vector Search）
   // TODO: Atlas UI或いはAPIで設定する必要があります

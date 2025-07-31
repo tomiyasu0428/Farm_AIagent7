@@ -1,5 +1,17 @@
 import { createTool } from "@mastra/core";
 import { z } from "zod";
+import { 
+  MaterialType, 
+  WeatherType, 
+  WorkResultType,
+  RecordDailyWorkInput,
+  RecordDailyWorkOutput,
+  GetDailyRecordsInput,
+  GetDailyRecordsOutput,
+  DailyWorkDocument,
+  PersonalKnowledgeDocument
+} from "../../types";
+import { AppConfig } from "../../config";
 
 /**
  * 日々の作業記録書き込みツール
@@ -75,7 +87,7 @@ export const recordDailyWorkTool = createTool({
         workRecord.notes || "",
         result.issues?.join(" ") || "",
         result.improvements?.join(" ") || "",
-        workRecord.materials?.map((m: any) => `${m.name} ${m.amount}${m.unit}`).join(" ") || "",
+        workRecord.materials?.map((m: MaterialType) => `${m.name} ${m.amount}${m.unit}`).join(" ") || "",
       ].filter(Boolean).join(" ");
 
       // タグ生成
@@ -84,7 +96,7 @@ export const recordDailyWorkTool = createTool({
         workRecord.weather?.condition || "",
         result.quality,
         result.effectiveness || "",
-        ...workRecord.materials?.map((m: any) => m.name) || [],
+        ...workRecord.materials?.map((m: MaterialType) => m.name) || [],
       ].filter(Boolean);
 
       // ベクトル埋め込み生成
@@ -94,7 +106,11 @@ export const recordDailyWorkTool = createTool({
       
       try {
         // ドキュメント保存用のタスクタイプを使用
-        embedding = await embeddingService.generateEmbedding(optimizedText, 1536, 'RETRIEVAL_DOCUMENT');
+        embedding = await embeddingService.generateEmbedding(
+          optimizedText, 
+          AppConfig.EMBEDDING.DEFAULT_DIMENSIONS, 
+          AppConfig.EMBEDDING.DEFAULT_TASK_TYPE
+        );
         console.log(`✅ Generated embedding: ${embedding.length}D vector`);
       } catch (error) {
         console.log(`⚠️  Embedding generation failed, saving without vector: ${(error as Error).message}`);
@@ -121,14 +137,14 @@ export const recordDailyWorkTool = createTool({
         tags,
         embedding,
         embeddingGeneratedAt: embedding ? new Date() : undefined,
-        embeddingModel: embedding ? 'models/text-embedding-004' : undefined,
-        embeddingDimensions: embedding ? 1536 : undefined,
+        embeddingModel: embedding ? AppConfig.EMBEDDING.MODEL : undefined,
+        embeddingDimensions: embedding ? AppConfig.EMBEDDING.DEFAULT_DIMENSIONS : undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
       // データベースに保存
-      const dailyWorkCollection = mongoClient.getCollection('dailyWork');
+      const dailyWorkCollection = mongoClient.getCollection(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
       await dailyWorkCollection.insertOne(dailyWorkDoc);
       
       console.log(`✅ 作業記録をデータベースに保存: ${recordId}`);
@@ -162,7 +178,7 @@ export const recordDailyWorkTool = createTool({
 
       // 改善点がある場合
       if (result.improvements && result.improvements.length > 0) {
-        recommendations.push(...result.improvements.map((imp: any) => `改善提案: ${imp}`));
+        recommendations.push(...result.improvements.map((imp: string) => `改善提案: ${imp}`));
       }
 
       // 類似記録の検索（実際のデータベースから）
@@ -172,7 +188,7 @@ export const recordDailyWorkTool = createTool({
         limit: 3,
       });
 
-      const relatedRecordsFormatted = relatedRecords.map(record => ({
+      const relatedRecordsFormatted = relatedRecords.map((record: DailyWorkDocument) => ({
         recordId: record.recordId,
         date: record.date.toISOString().split('T')[0],
         similarity: `同じ${record.workType}作業`,
@@ -199,7 +215,7 @@ export const recordDailyWorkTool = createTool({
           updatedAt: new Date(),
         };
 
-        const personalKnowledgeCollection = mongoClient.getCollection('personalKnowledge');
+        const personalKnowledgeCollection = mongoClient.getCollection(AppConfig.DATABASE.COLLECTIONS.PERSONAL_KNOWLEDGE);
         await personalKnowledgeCollection.insertOne(personalKnowledgeDoc);
         
         console.log(`📚 個別農場知識として学習: ${knowledgeTitle}`);
@@ -246,7 +262,7 @@ export const getDailyRecordsTool = createTool({
       end: z.string().describe("終了日（YYYY-MM-DD）"),
     }).optional().describe("期間での絞り込み"),
     quality: z.enum(["excellent", "good", "fair", "poor"]).optional().describe("作業品質での絞り込み"),
-    limit: z.number().min(1).max(50).default(10).describe("取得件数上限"),
+    limit: z.number().min(1).max(AppConfig.SEARCH.MAX_LIMIT).default(AppConfig.SEARCH.DEFAULT_LIMIT).describe("取得件数上限"),
     includeAnalysis: z.boolean().default(true).describe("分析情報を含めるか"),
   }),
   outputSchema: z.object({
