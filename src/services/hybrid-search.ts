@@ -214,9 +214,13 @@ export class HybridSearchService {
     limit: number
   ): Promise<DailyWorkDocument[]> {
     try {
-      // クエリをベクトル化
+      // クエリをベクトル化（検索クエリ用のタスクタイプを使用）
       const optimizedQuery = EmbeddingService.optimizeTextForEmbedding(query);
-      const queryVector = await this.embeddingService.generateEmbedding(optimizedQuery);
+      const queryVector = await this.embeddingService.generateEmbedding(
+        optimizedQuery, 
+        1536, 
+        'RETRIEVAL_QUERY'
+      );
 
       const collection = this.mongoClient.getCollection<DailyWorkDocument>('dailyWork');
 
@@ -252,7 +256,7 @@ export class HybridSearchService {
    * クエリからベクトル埋め込みを生成
    */
   private async generateEmbedding(text: string): Promise<number[]> {
-    return await this.embeddingService.generateEmbedding(text);
+    return await this.embeddingService.generateEmbedding(text, 1536, 'RETRIEVAL_QUERY');
   }
 
   /**

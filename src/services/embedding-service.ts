@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
  * Gemini Embeddings APIサービス
- * テキストをベクトル表現に変換する
+ * テキストをベクトル表現に変換する（最新API仕様に準拠）
  */
 export class EmbeddingService {
   private genAI: GoogleGenerativeAI;
@@ -16,21 +16,23 @@ export class EmbeddingService {
     
     this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
     // 最新のGemini Embeddingモデルを使用
-    this.model = 'text-embedding-004'; // または 'gemini-embedding-001'
+    this.model = 'models/text-embedding-004';
   }
 
   /**
    * テキストをベクトル埋め込みに変換
    * @param text 変換するテキスト
    * @param outputDimensionality 出力次元数（768, 1536, 3072から選択）
+   * @param taskType 埋め込みタスクタイプ
    * @returns ベクトル配列
    */
   async generateEmbedding(
     text: string, 
-    outputDimensionality: 768 | 1536 | 3072 = 1536
+    outputDimensionality: 768 | 1536 | 3072 = 1536,
+    taskType: 'RETRIEVAL_QUERY' | 'RETRIEVAL_DOCUMENT' | 'SEMANTIC_SIMILARITY' | 'CLASSIFICATION' | 'CLUSTERING' = 'RETRIEVAL_DOCUMENT'
   ): Promise<number[]> {
     try {
-      console.log(`🔄 Generating embedding for text: "${text.substring(0, 50)}..."`);
+      console.log(`🔄 Generating embedding for text: "${text.substring(0, 50)}..." (${taskType})`);
       
       const model = this.genAI.getGenerativeModel({ 
         model: this.model,
@@ -41,6 +43,7 @@ export class EmbeddingService {
           parts: [{ text }],
           role: 'user'
         },
+        taskType,
         outputDimensionality,
       });
 
@@ -50,7 +53,7 @@ export class EmbeddingService {
         throw new Error('Failed to generate embedding: empty result');
       }
 
-      console.log(`✅ Generated ${embedding.length}D embedding vector`);
+      console.log(`✅ Generated ${embedding.length}D embedding vector (${taskType})`);
       return embedding;
 
     } catch (error) {
@@ -70,16 +73,18 @@ export class EmbeddingService {
    * バッチでテキストをベクトル化
    * @param texts テキスト配列
    * @param outputDimensionality 出力次元数
+   * @param taskType 埋め込みタスクタイプ
    * @returns ベクトル配列の配列
    */
   async generateBatchEmbeddings(
     texts: string[], 
-    outputDimensionality: 768 | 1536 | 3072 = 1536
+    outputDimensionality: 768 | 1536 | 3072 = 1536,
+    taskType: 'RETRIEVAL_QUERY' | 'RETRIEVAL_DOCUMENT' | 'SEMANTIC_SIMILARITY' | 'CLASSIFICATION' | 'CLUSTERING' = 'RETRIEVAL_DOCUMENT'
   ): Promise<number[][]> {
-    console.log(`🔄 Generating batch embeddings for ${texts.length} texts`);
+    console.log(`🔄 Generating batch embeddings for ${texts.length} texts (${taskType})`);
     
     const embeddings = await Promise.all(
-      texts.map(text => this.generateEmbedding(text, outputDimensionality))
+      texts.map(text => this.generateEmbedding(text, outputDimensionality, taskType))
     );
 
     console.log(`✅ Generated ${embeddings.length} batch embeddings`);

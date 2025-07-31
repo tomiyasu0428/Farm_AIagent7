@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
 import { recordDailyWorkTool } from "../tools";
@@ -50,7 +50,7 @@ const writeAgentInstructions = `
 export const writeAgent = new Agent({
   name: "WriteAgent",
   instructions: writeAgentInstructions, 
-  model: openai("gpt-4o"),
+  model: google("models/gemini-2.5-flash"),
   
   tools: {
     // 日々の作業記録・経験蓄積

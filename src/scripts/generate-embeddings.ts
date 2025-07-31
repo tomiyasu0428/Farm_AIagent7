@@ -53,8 +53,8 @@ async function generateEmbeddingsForExistingRecords() {
           
           console.log(`🔄 Generating embedding for record: ${record.recordId}`);
           
-          // 埋め込み生成
-          const embedding = await embeddingService.generateEmbedding(optimizedText, 1536);
+          // 埋め込み生成（ドキュメント保存用）
+          const embedding = await embeddingService.generateEmbedding(optimizedText, 1536, 'RETRIEVAL_DOCUMENT');
           
           // データベース更新
           await dailyWorkCollection.updateOne(
@@ -63,7 +63,7 @@ async function generateEmbeddingsForExistingRecords() {
               $set: { 
                 embedding,
                 embeddingGeneratedAt: new Date(),
-                embeddingModel: 'text-embedding-004',
+                embeddingModel: 'models/text-embedding-004',
                 embeddingDimensions: 1536
               } 
             }
@@ -133,7 +133,7 @@ async function testEmbeddingSearch() {
       console.log(`\n🔍 Testing query: "${query}"`);
       
       try {
-        const queryEmbedding = await embeddingService.generateEmbedding(query, 1536);
+        const queryEmbedding = await embeddingService.generateEmbedding(query, 1536, 'RETRIEVAL_QUERY');
         console.log(`✅ Generated query embedding: ${queryEmbedding.length}D vector`);
         
         // コサイン類似度テスト（サンプル）

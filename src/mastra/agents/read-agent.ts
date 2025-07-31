@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
 import { getExternalWeatherTool, getFieldInfoTool, getDailyRecordsTool } from "../tools";
@@ -43,7 +43,7 @@ const readAgentInstructions = `
 export const readAgent = new Agent({
   name: "ReadAgent", 
   instructions: readAgentInstructions,
-  model: openai("gpt-4o"),
+  model: google("models/gemini-2.5-flash"),
   
   tools: {
     // 天気情報取得

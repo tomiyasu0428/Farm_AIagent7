@@ -93,7 +93,8 @@ export const recordDailyWorkTool = createTool({
       let embedding: number[] | undefined;
       
       try {
-        embedding = await embeddingService.generateEmbedding(optimizedText, 1536);
+        // ドキュメント保存用のタスクタイプを使用
+        embedding = await embeddingService.generateEmbedding(optimizedText, 1536, 'RETRIEVAL_DOCUMENT');
         console.log(`✅ Generated embedding: ${embedding.length}D vector`);
       } catch (error) {
         console.log(`⚠️  Embedding generation failed, saving without vector: ${(error as Error).message}`);
@@ -120,7 +121,7 @@ export const recordDailyWorkTool = createTool({
         tags,
         embedding,
         embeddingGeneratedAt: embedding ? new Date() : undefined,
-        embeddingModel: embedding ? 'text-embedding-004' : undefined,
+        embeddingModel: embedding ? 'models/text-embedding-004' : undefined,
         embeddingDimensions: embedding ? 1536 : undefined,
         createdAt: new Date(),
         updatedAt: new Date(),

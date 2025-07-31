@@ -7,6 +7,7 @@ import { MongoClient, Db, Collection } from 'mongodb';
 export class MongoDBClient {
   private client: MongoClient | null = null;
   private db: Db | null = null;
+  private connected: boolean = false;
   
   constructor(private connectionString: string, private dbName: string) {}
 
@@ -17,10 +18,16 @@ export class MongoDBClient {
     try {
       this.client = new MongoClient(this.connectionString);
       await this.client.connect();
+      
+      // 接続テスト
       this.db = this.client.db(this.dbName);
-      console.log(`✅ MongoDB connected: ${this.dbName}`);
+      await this.db.admin().ping();
+      
+      this.connected = true;
+      console.log(`✅ MongoDB connected: ${this.sanitizeConnectionString(this.dbName)}`);
     } catch (error) {
-      console.error('❌ MongoDB connection failed:', error);
+      this.connected = false;
+      console.error('❌ MongoDB connection failed:', this.sanitizeError(error));
       throw error;
     }
   }
@@ -30,10 +37,17 @@ export class MongoDBClient {
    */
   async disconnect(): Promise<void> {
     if (this.client) {
-      await this.client.close();
-      this.client = null;
-      this.db = null;
-      console.log('🔌 MongoDB disconnected');
+      try {
+        await this.client.close();
+        this.connected = false;
+        console.log('🔌 MongoDB disconnected');
+      } catch (error) {
+        console.error('❌ MongoDB disconnection failed:', this.sanitizeError(error));
+      } finally {
+        this.client = null;
+        this.db = null;
+        this.connected = false;
+      }
     }
   }
 
@@ -41,8 +55,8 @@ export class MongoDBClient {
    * コレクション取得
    */
   getCollection<T = any>(name: string): Collection<T> {
-    if (!this.db) {
-      throw new Error('Database not connected');
+    if (!this.db || !this.connected) {
+      throw new Error('Database not connected. Call connect() first.');
     }
     return this.db.collection<T>(name);
   }
@@ -51,7 +65,41 @@ export class MongoDBClient {
    * 接続状態確認
    */
   isConnected(): boolean {
-    return this.client !== null && this.db !== null;
+    return this.connected && this.client !== null && this.db !== null;
+  }
+
+  /**
+   * 機密情報をマスクしたエラーメッセージ
+   */
+  private sanitizeError(error: any): string {
+    if (error && error.message) {
+      return error.message.replace(/\/\/.*:.*@/g, '//***:***@');
+    }
+    return String(error);
+  }
+
+  /**
+   * 接続文字列から機密情報を削除
+   */
+  private sanitizeConnectionString(connectionString: string): string {
+    return connectionString.replace(/\/\/.*:.*@/g, '//***:***@');
+  }
+
+  /**
+   * 接続の健全性チェック
+   */
+  async healthCheck(): Promise<boolean> {
+    try {
+      if (!this.db || !this.connected) {
+        return false;
+      }
+      await this.db.admin().ping();
+      return true;
+    } catch (error) {
+      console.error('❌ Database health check failed:', this.sanitizeError(error));
+      this.connected = false;
+      return false;
+    }
   }
 }
 
