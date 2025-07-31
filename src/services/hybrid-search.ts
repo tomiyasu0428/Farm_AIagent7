@@ -1,5 +1,6 @@
 import { getMongoClient } from '../database/mongodb-client';
 import { DailyWorkDocument, PersonalKnowledgeDocument } from '../database/mongodb-client';
+import { getEmbeddingService, EmbeddingService } from './embedding-service';
 
 /**
  * ハイブリッド検索サービス
@@ -7,6 +8,7 @@ import { DailyWorkDocument, PersonalKnowledgeDocument } from '../database/mongod
  */
 export class HybridSearchService {
   private mongoClient = getMongoClient();
+  private embeddingService = getEmbeddingService();
 
   /**
    * 作業記録のハイブリッド検索
@@ -50,18 +52,38 @@ export class HybridSearchService {
         score: { $meta: 'textScore' }
       }).sort({ score: { $meta: 'textScore' } }).limit(limit * 2).toArray();
 
-      // 2. ベクトル検索（TODO: 実装予定）
-      // const vectorResults = await this.vectorSearch(query, baseFilter, limit);
+      // 2. ベクトル検索
+      let vectorResults: DailyWorkDocument[] = [];
+      try {
+        vectorResults = await this.vectorSearchDailyWork(query, baseFilter, limit);
+      } catch (error) {
+        console.log('⚠️  Vector search not available, using keyword search only:', error.message);
+      }
 
-      // 3. 結果統合（現在はキーワード検索のみ）
-      const results = keywordResults.slice(0, limit);
+      // 3. 結果統合（ハイブリッド検索）
+      let results: DailyWorkDocument[];
+      let searchMethod: 'keyword' | 'vector' | 'hybrid';
+
+      if (vectorResults.length > 0 && keywordResults.length > 0) {
+        // ハイブリッド：両方の結果をRRFで統合
+        results = this.fuseResults(keywordResults, vectorResults, 60).slice(0, limit);
+        searchMethod = 'hybrid';
+      } else if (vectorResults.length > 0) {
+        // ベクトル検索のみ
+        results = vectorResults.slice(0, limit);
+        searchMethod = 'vector';
+      } else {
+        // キーワード検索のみ
+        results = keywordResults.slice(0, limit);
+        searchMethod = 'keyword';
+      }
 
       return {
         records: results,
         searchMetadata: {
           totalFound: results.length,
-          searchMethod: 'keyword',
-          relevanceScores: results.map(r => (r as any).score || 0),
+          searchMethod,
+          relevanceScores: results.map(r => (r as any).score || (r as any).vectorScore || 0),
         },
       };
     } catch (error) {
@@ -134,26 +156,103 @@ export class HybridSearchService {
 
   /**
    * Reciprocal Rank Fusion (RRF)による結果統合
-   * TODO: ベクトル検索実装後に統合
    */
-  private fuseResults<T>(
+  private fuseResults<T extends { _id?: any }>(
     keywordResults: T[],
     vectorResults: T[],
     k: number = 60
   ): T[] {
-    // RRFスコア計算とマージロジック
-    // 現在は未実装（将来のベクトル検索統合時に実装）
-    return keywordResults;
+    // 各結果にスコアを付与
+    const keywordScores = new Map<string, number>();
+    const vectorScores = new Map<string, number>();
+    
+    keywordResults.forEach((result, index) => {
+      const id = result._id?.toString() || `keyword_${index}`;
+      keywordScores.set(id, 1 / (k + index + 1));
+    });
+    
+    vectorResults.forEach((result, index) => {
+      const id = result._id?.toString() || `vector_${index}`;
+      vectorScores.set(id, 1 / (k + index + 1));
+    });
+    
+    // 全ユニーク結果を取得
+    const allResults = new Map<string, T>();
+    keywordResults.forEach(result => {
+      const id = result._id?.toString() || JSON.stringify(result);
+      allResults.set(id, result);
+    });
+    vectorResults.forEach(result => {
+      const id = result._id?.toString() || JSON.stringify(result);
+      allResults.set(id, result);
+    });
+    
+    // RRFスコア計算
+    const scoredResults = Array.from(allResults.entries()).map(([id, result]) => {
+      const keywordScore = keywordScores.get(id) || 0;
+      const vectorScore = vectorScores.get(id) || 0;
+      const fusedScore = keywordScore + vectorScore;
+      
+      return {
+        result,
+        score: fusedScore,
+      };
+    });
+    
+    // スコア順にソート
+    scoredResults.sort((a, b) => b.score - a.score);
+    
+    return scoredResults.map(item => item.result);
+  }
+
+  /**
+   * 作業記録のベクトル検索
+   */
+  private async vectorSearchDailyWork(
+    query: string, 
+    baseFilter: any, 
+    limit: number
+  ): Promise<DailyWorkDocument[]> {
+    try {
+      // クエリをベクトル化
+      const optimizedQuery = EmbeddingService.optimizeTextForEmbedding(query);
+      const queryVector = await this.embeddingService.generateEmbedding(optimizedQuery);
+
+      const collection = this.mongoClient.getCollection<DailyWorkDocument>('dailyWork');
+
+      // MongoDB Atlas Vector Search
+      // 注意: Atlas Vector Searchインデックスが設定されている必要があります
+      const vectorResults = await collection.aggregate([
+        {
+          $vectorSearch: {
+            index: "dailyWork_vector_index", // Atlas UIで作成するインデックス名
+            path: "embedding",
+            queryVector: queryVector,
+            numCandidates: limit * 5,
+            limit: limit,
+            filter: baseFilter
+          }
+        },
+        {
+          $addFields: {
+            vectorScore: { $meta: "vectorSearchScore" }
+          }
+        }
+      ]).toArray();
+
+      return vectorResults as DailyWorkDocument[];
+
+    } catch (error) {
+      console.log('Vector search failed, falling back to keyword search:', error.message);
+      return [];
+    }
   }
 
   /**
    * クエリからベクトル埋め込みを生成
-   * TODO: OpenAI Embeddings APIとの統合
    */
   private async generateEmbedding(text: string): Promise<number[]> {
-    // TODO: OpenAI text-embedding-3-small/large API呼び出し
-    // 現在はモック実装
-    return new Array(1536).fill(0).map(() => Math.random());
+    return await this.embeddingService.generateEmbedding(text);
   }
 
   /**

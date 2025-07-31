@@ -52,11 +52,13 @@ export const recordDailyWorkTool = createTool({
       similarity: z.string(),
     })).optional().describe("類似した過去の記録"),
   }),
-  execute: async ({ userId, fieldId, workRecord, result, followUpNeeded, nextActions }) => {
+  execute: async (context) => {
+    const { userId, fieldId, workRecord, result, followUpNeeded, nextActions } = context.input;
     try {
       // MongoDB統合: 実際のデータベースに保存
       const { getMongoClient } = await import("../../database/mongodb-client");
       const { getHybridSearchService } = await import("../../services/hybrid-search");
+      const { getEmbeddingService, EmbeddingService } = await import("../../services/embedding-service");
       
       const mongoClient = getMongoClient();
       const searchService = getHybridSearchService();
@@ -73,7 +75,7 @@ export const recordDailyWorkTool = createTool({
         workRecord.notes || "",
         result.issues?.join(" ") || "",
         result.improvements?.join(" ") || "",
-        workRecord.materials?.map(m => `${m.name} ${m.amount}${m.unit}`).join(" ") || "",
+        workRecord.materials?.map((m: any) => `${m.name} ${m.amount}${m.unit}`).join(" ") || "",
       ].filter(Boolean).join(" ");
 
       // タグ生成
@@ -82,8 +84,20 @@ export const recordDailyWorkTool = createTool({
         workRecord.weather?.condition || "",
         result.quality,
         result.effectiveness || "",
-        ...workRecord.materials?.map(m => m.name) || [],
+        ...workRecord.materials?.map((m: any) => m.name) || [],
       ].filter(Boolean);
+
+      // ベクトル埋め込み生成
+      const embeddingService = getEmbeddingService();
+      const optimizedText = EmbeddingService.optimizeTextForEmbedding(textContent);
+      let embedding: number[] | undefined;
+      
+      try {
+        embedding = await embeddingService.generateEmbedding(optimizedText, 1536);
+        console.log(`✅ Generated embedding: ${embedding.length}D vector`);
+      } catch (error) {
+        console.log(`⚠️  Embedding generation failed, saving without vector: ${(error as Error).message}`);
+      }
 
       // データベースドキュメント構築
       const dailyWorkDoc = {
@@ -104,6 +118,10 @@ export const recordDailyWorkTool = createTool({
         nextActions,
         textContent,
         tags,
+        embedding,
+        embeddingGeneratedAt: embedding ? new Date() : undefined,
+        embeddingModel: embedding ? 'text-embedding-004' : undefined,
+        embeddingDimensions: embedding ? 1536 : undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -143,7 +161,7 @@ export const recordDailyWorkTool = createTool({
 
       // 改善点がある場合
       if (result.improvements && result.improvements.length > 0) {
-        recommendations.push(...result.improvements.map(imp => `改善提案: ${imp}`));
+        recommendations.push(...result.improvements.map((imp: any) => `改善提案: ${imp}`));
       }
 
       // 類似記録の検索（実際のデータベースから）
@@ -258,7 +276,8 @@ export const getDailyRecordsTool = createTool({
     }).optional(),
     recommendations: z.array(z.string()).describe("過去の経験に基づく推奨事項"),
   }),
-  execute: async ({ userId, fieldId, workType, dateRange, quality, limit, includeAnalysis }) => {
+  execute: async (context) => {
+    const { userId, fieldId, workType, dateRange, quality, limit, includeAnalysis } = context.input;
     try {
       // MongoDB統合: 実際のデータベースから検索
       const { getMongoClient } = await import("../../database/mongodb-client");
