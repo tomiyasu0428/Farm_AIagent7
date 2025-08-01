@@ -44,9 +44,8 @@ export class EmbeddingService {
           parts: [{ text }],
           role: 'user'
         },
-        taskType,
-        outputDimensionality,
-      });
+        taskType: taskType as any, // Type assertion for Gemini API compatibility
+      } as any);
 
       const embedding = result.embedding.values;
       

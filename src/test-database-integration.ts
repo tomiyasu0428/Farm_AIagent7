@@ -69,6 +69,12 @@ async function testDatabaseIntegration() {
 
   } catch (error) {
     console.error("❌ テスト中にエラーが発生:", error);
+  } finally {
+    const mongoClient = getMongoClient();
+    if (mongoClient.isConnected()) {
+      await mongoClient.disconnect();
+      console.log("🔌 MongoDB接続を切断しました");
+    }
   }
 }
 

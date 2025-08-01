@@ -213,7 +213,7 @@ export class AppConfig {
   static getDatabaseConfig() {
     return {
       uri: this.getRequiredEnvVar('MONGODB_URI'),
-      dbName: this.getEnvVar('MONGODB_DATABASE', this.DATABASE.DEFAULT_DB),
+      dbName: this.getEnvVar('MONGODB_DATABASE', this.DATABASE.DEFAULT_DB), // MONGODB_DB_NAME削除（統一）
       connectionTimeout: this.getEnvNumber('MONGODB_CONNECTION_TIMEOUT', this.DATABASE.CONNECTION_TIMEOUT),
       socketTimeout: this.getEnvNumber('MONGODB_SOCKET_TIMEOUT', this.DATABASE.SOCKET_TIMEOUT),
       maxPoolSize: this.getEnvNumber('MONGODB_MAX_POOL_SIZE', this.DATABASE.MAX_POOL_SIZE),

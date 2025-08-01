@@ -51,7 +51,7 @@ export const getFieldInfoTool = createTool({
     summary: z.string().describe("圃場全体のサマリー"),
     recommendations: z.array(z.string()).describe("現在の状況に基づく推奨事項"),
   }),
-  execute: async ({ userId, fieldId, includeHistory }) => {
+  execute: async ({ context: { userId, fieldId, includeHistory } }) => {
     try {
       // MongoDB統合: 実際のデータベースから取得
       const { getMongoClient } = await import("../../database/mongodb-client");
@@ -74,10 +74,10 @@ export const getFieldInfoTool = createTool({
 
       // 圃場情報取得
       const fieldsCollection = mongoClient.getCollection('fields');
-      const query = { farmId: user.farmId };
-      if (fieldId) {
-        query.fieldId = fieldId;
-      }
+      const query = {
+        farmId: user.farmId,
+        ...(fieldId && { fieldId })
+      };
       
       const fields = await fieldsCollection.find(query).toArray();
       
@@ -89,7 +89,7 @@ export const getFieldInfoTool = createTool({
           const workRecords = await searchService.searchDailyRecords({
             userId,
             fieldId: field.fieldId,
-            query: "*", // 全件取得
+            query: "", // 空クエリで全記録を取得
             limit: 5
           });
           

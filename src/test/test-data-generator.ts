@@ -2,10 +2,12 @@ import { faker } from '@faker-js/faker/locale/ja';
 import { 
   UserDocument, 
   FarmDocument, 
-  FieldDocument, 
+  FieldDocument
+} from '../database/mongodb-client.js';
+import {
   DailyWorkDocument, 
   PersonalKnowledgeDocument 
-} from '../database/mongodb-client.js';
+} from '../types/index.js';
 
 /**
  * 動的テストデータ生成器
@@ -49,7 +51,7 @@ export class TestDataGenerator {
       farmId: this.generateTestId('test_farm'),
       profileImageUrl: faker.image.avatar(),
       joinedAt: faker.date.past({ years: 2 }),
-      lastActiveAt: faker.date.recent({ days: 7 }),
+      lastActiveAt: faker.date.past({ years: 0.02 }),
       preferences: {
         notifications: faker.datatype.boolean(),
         language: 'ja',
@@ -60,7 +62,7 @@ export class TestDataGenerator {
         }
       },
       createdAt: faker.date.past({ years: 1 }),
-      updatedAt: faker.date.recent({ days: 1 })
+      updatedAt: faker.date.past({ years: 0.003 })
     };
 
     return { ...baseData, ...overrides };
@@ -86,7 +88,7 @@ export class TestDataGenerator {
         fertility: faker.helpers.arrayElement(['高', '中', '低'])
       },
       createdAt: faker.date.past({ years: 1 }),
-      updatedAt: faker.date.recent({ days: 30 })
+      updatedAt: faker.date.past({ years: 0.08 })
     };
 
     return { ...baseData, ...overrides };
@@ -134,7 +136,7 @@ export class TestDataGenerator {
         notes: faker.lorem.sentence()
       })),
       createdAt: faker.date.past({ years: 1 }),
-      updatedAt: faker.date.recent({ days: 30 })
+      updatedAt: faker.date.past({ years: 0.08 })
     };
 
     return { ...baseData, ...overrides };
@@ -161,8 +163,8 @@ export class TestDataGenerator {
       recordId: this.generateTestId('test_record'),
       userId,
       fieldId,
-      date: faker.date.recent({ days: 30 }),
-      workType,
+      date: faker.date.past({ years: 0.08 }),
+      workType: workType as "播種" | "施肥" | "防除" | "中耕" | "収穫" | "その他",
       description,
       materials: faker.helpers.arrayElements(materials, { min: 0, max: 2 }),
       weather: {
@@ -195,8 +197,8 @@ export class TestDataGenerator {
         faker.helpers.arrayElement(['晴れ', '曇り', '雨']),
         faker.helpers.arrayElement(['成功', '普通', '課題'])
       ],
-      createdAt: faker.date.past({ days: 30 }),
-      updatedAt: faker.date.recent({ days: 1 })
+      createdAt: faker.date.past({ years: 1 }),
+      updatedAt: faker.date.past({ years: 0.1 })
     };
 
     return { ...baseData, ...overrides };
@@ -206,7 +208,7 @@ export class TestDataGenerator {
    * 作業種別に応じた説明文を生成
    */
   private generateWorkDescription(workType: string): string {
-    const descriptions = {
+    const descriptions: Record<string, string[]> = {
       '播種': [
         'じゃがいもの播種作業を実施',
         'とうもろこしの種まき作業',
@@ -250,7 +252,7 @@ export class TestDataGenerator {
     userId: string, 
     overrides: Partial<PersonalKnowledgeDocument> = {}
   ): PersonalKnowledgeDocument {
-    const categories = ['experience', 'method', 'observation', 'lesson'];
+    const categories = ['experience', 'method', 'observation', 'lesson'] as const;
     const category = faker.helpers.arrayElement(categories);
 
     const baseData: PersonalKnowledgeDocument = {
@@ -259,16 +261,16 @@ export class TestDataGenerator {
       userId,
       title: this.generateKnowledgeTitle(category),
       content: faker.lorem.sentences(2),
-      category,
+      category: category as "experience" | "technique" | "timing" | "resource" | "issue",
       relatedRecords: [this.generateTestId('test_record')],
       confidence: faker.number.float({ min: 0.5, max: 1.0, fractionDigits: 2 }),
       frequency: faker.number.int({ min: 1, max: 10 }),
       tags: faker.helpers.arrayElements([
         '成功事例', '失敗事例', '季節的', '天候依存', '土壌特性', '品種特性'
       ], { min: 1, max: 3 }),
-      lastUsed: faker.date.recent({ days: 30 }),
-      createdAt: faker.date.past({ days: 90 }),
-      updatedAt: faker.date.recent({ days: 7 })
+      lastUsed: faker.date.past({ years: 0.1 }),
+      createdAt: faker.date.past({ years: 1 }),
+      updatedAt: faker.date.past({ years: 0.1 })
     };
 
     return { ...baseData, ...overrides };
@@ -278,7 +280,7 @@ export class TestDataGenerator {
    * カテゴリに応じた知識タイトルを生成
    */
   private generateKnowledgeTitle(category: string): string {
-    const titles = {
+    const titles: Record<string, string[]> = {
       experience: [
         '播種時期の最適化による収量向上',
         '防除タイミングでの病害予防成功',

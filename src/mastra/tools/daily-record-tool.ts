@@ -64,8 +64,7 @@ export const recordDailyWorkTool = createTool({
       similarity: z.string(),
     })).optional().describe("類似した過去の記録"),
   }),
-  execute: async (context) => {
-    const { userId, fieldId, workRecord, result, followUpNeeded, nextActions } = context.input;
+  execute: async ({ context: { userId, fieldId, workRecord, result, followUpNeeded, nextActions } }) => {
     try {
       // MongoDB統合: 実際のデータベースに保存
       const { getMongoClient } = await import("../../database/mongodb-client");
@@ -77,6 +76,11 @@ export const recordDailyWorkTool = createTool({
       
       if (!mongoClient.isConnected()) {
         await mongoClient.connect();
+      }
+      
+      // 接続成功を確認
+      if (!mongoClient.isConnected()) {
+        throw new Error('Failed to establish MongoDB connection');
       }
 
       const recordId = `record_${Date.now()}_${userId.slice(-4)}`;
@@ -199,9 +203,14 @@ export const recordDailyWorkTool = createTool({
         const knowledgeTitle = `${workRecord.workType}作業での成功事例`;
         const knowledgeContent = `${workRecord.description} - 結果: ${result.quality}`;
         
+        // 圧場情報からfarmIdを取得
+        const fieldCollection = mongoClient.getCollection('fields');
+        const fieldDoc = await fieldCollection.findOne({ fieldId });
+        const actualFarmId = fieldDoc?.farmId || `farm_${userId.slice(-4)}`; // フォールバックとしてユーザーIDベースのfarmIdを使用
+        
         const personalKnowledgeDoc = {
           knowledgeId: `knowledge_${Date.now()}_${userId.slice(-4)}`,
-          farmId: fieldId, // TODO: 実際のfarmIdを取得
+          farmId: actualFarmId,
           userId,
           title: knowledgeTitle,
           content: knowledgeContent,
@@ -264,6 +273,7 @@ export const getDailyRecordsTool = createTool({
     quality: z.enum(["excellent", "good", "fair", "poor"]).optional().describe("作業品質での絞り込み"),
     limit: z.number().min(1).max(AppConfig.SEARCH.MAX_LIMIT).default(AppConfig.SEARCH.DEFAULT_LIMIT).describe("取得件数上限"),
     includeAnalysis: z.boolean().default(true).describe("分析情報を含めるか"),
+    allowMockData: z.boolean().default(false).describe("レコードが見つからない場合にモックデータを返すか"),
   }),
   outputSchema: z.object({
     userId: z.string(),
@@ -293,8 +303,7 @@ export const getDailyRecordsTool = createTool({
     }).optional(),
     recommendations: z.array(z.string()).describe("過去の経験に基づく推奨事項"),
   }),
-  execute: async (context) => {
-    const { userId, fieldId, workType, dateRange, quality, limit, includeAnalysis } = context.input;
+  execute: async ({ context: { userId, fieldId, workType, dateRange, quality, limit, includeAnalysis, allowMockData } }) => {
     try {
       // MongoDB統合: 実際のデータベースから検索
       const { getMongoClient } = await import("../../database/mongodb-client");
@@ -306,6 +315,11 @@ export const getDailyRecordsTool = createTool({
       if (!mongoClient.isConnected()) {
         await mongoClient.connect();
       }
+      
+      // 接続成功を確認
+      if (!mongoClient.isConnected()) {
+        throw new Error('Failed to establish MongoDB connection');
+      }
 
       // ハイブリッド検索実行
       const searchResults = await searchService.searchDailyRecords({
@@ -313,13 +327,16 @@ export const getDailyRecordsTool = createTool({
         query: workType ? `${workType} 作業` : "農作業 記録",
         fieldId,
         workType,
-        dateRange,
+        dateRange: dateRange ? {
+          start: new Date(dateRange.start),
+          end: new Date(dateRange.end)
+        } : undefined,
         limit,
       });
 
       const records = searchResults.records.map(record => ({
         recordId: record.recordId,
-        fieldName: `圃場_${record.fieldId}`, // TODO: 実際の圃場名を取得
+        fieldName: `圃場_${record.fieldId}`, // フィールド名解決は後で実装
         date: record.date.toISOString().split('T')[0],
         workType: record.workType,
         description: record.description,
@@ -331,8 +348,8 @@ export const getDailyRecordsTool = createTool({
         learnings: [], // TODO: 学習ポイントを抽出
       }));
 
-      // データが少ない場合はモックデータも含める
-      if (records.length === 0) {
+      // データが少ない場合はモックデータも含める（設定に基づく）
+      if (records.length === 0 && allowMockData) {
         const mockRecords = [
         {
           recordId: "record_001",
@@ -408,12 +425,23 @@ export const getDailyRecordsTool = createTool({
       } : undefined;
 
       // 個別農場知識からの推奨事項
-      const knowledgeSearch = await searchService.searchPersonalKnowledge({
-        userId,
-        farmId: fieldId || "default", // TODO: 実際のfarmIdを取得
-        query: workType ? `${workType} 成功` : "農作業 経験",
-        limit: 3,
-      });
+      // 個別農場知識からの推奨事項
+      let knowledgeSearch;
+      try {
+        // 圧場からfarmIdを解決
+        const fieldDoc = fieldId ? await mongoClient.getCollection('fields').findOne({ fieldId }) : null;
+        const actualFarmId = fieldDoc?.farmId || `farm_${userId.slice(-4)}`;
+        
+        knowledgeSearch = await searchService.searchPersonalKnowledge({
+          userId,
+          farmId: actualFarmId,
+          query: workType ? `${workType} 成功` : "農作業 経験",
+          limit: 3,
+        });
+      } catch (error) {
+        console.warn('⚠️  Personal knowledge search failed, using default recommendations:', error);
+        knowledgeSearch = { knowledge: [], searchMetadata: { totalFound: 0, avgConfidence: 0, categories: [] } };
+      }
 
       const recommendations = knowledgeSearch.knowledge.length > 0
         ? knowledgeSearch.knowledge.map(k => k.content.substring(0, 50) + "...")

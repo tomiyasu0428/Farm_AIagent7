@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, Document } from 'mongodb';
+import { MongoClient, Db, Collection, Document, ObjectId } from 'mongodb';
 import { 
   DailyWorkDocument, 
   PersonalKnowledgeDocument, 
@@ -69,9 +69,13 @@ export class MongoDBClient {
 
   /**
    * 接続状態確認
+   * 改善: 実際のMongoDB接続状態をチェック
    */
   isConnected(): boolean {
-    return this.connected && this.client !== null && this.db !== null;
+    return this.connected && 
+           this.client !== null && 
+           this.db !== null &&
+           (this.client as any).topology?.isConnected() === true;
   }
 
   /**
@@ -106,13 +110,21 @@ export class MongoDBClient {
 
   /**
    * 接続の健全性チェック
+   * 改善: より適切なタイムアウトとリトライ
    */
   async healthCheck(): Promise<boolean> {
     try {
       if (!this.db || !this.connected) {
         return false;
       }
-      await this.db.admin().ping();
+      
+      // 5秒タイムアウトでpingテスト
+      const pingPromise = this.db.admin().ping();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Health check timeout')), 5000)
+      );
+      
+      await Promise.race([pingPromise, timeoutPromise]);
       return true;
     } catch (error) {
       console.error('❌ Database health check failed:', this.sanitizeError(error));

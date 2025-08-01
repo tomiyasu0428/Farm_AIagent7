@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { getMongoClient } from "./database/mongodb-client";
 import { recordDailyWorkTool, getDailyRecordsTool } from "./mastra/tools/daily-record-tool";
 import { getFieldInfoTool } from "./mastra/tools/field-info-tool";
+// RuntimeContextは後で実装
 
 async function testRealData() {
   console.log("🧪 実データテストを開始します...\n");
@@ -90,8 +91,9 @@ async function testRealData() {
     // 2. 作業記録ツールのテスト
     console.log("2️⃣ 作業記録ツール実テスト");
     const recordResult = await recordDailyWorkTool.execute({
-      userId: testUserId,
-      fieldId: testFieldId,
+      context: {
+        userId: testUserId,
+        fieldId: testFieldId,
       workRecord: {
         date: "2024-07-31",
         workType: "防除",
@@ -118,8 +120,10 @@ async function testRealData() {
         effectiveness: "high",
         satisfaction: 4,
       },
-      followUpNeeded: false,
-      nextActions: ["3日後の効果確認"],
+        followUpNeeded: false,
+        nextActions: ["3日後の効果確認"],
+      },
+      runtimeContext: { get: () => undefined, set: () => {}, registry: new Map() } as any
     });
 
     console.log("📝 記録結果:", recordResult.message);
@@ -129,8 +133,11 @@ async function testRealData() {
     // 3. 圃場情報取得ツールのテスト
     console.log("3️⃣ 圃場情報取得ツール実テスト");
     const fieldResult = await getFieldInfoTool.execute({
-      userId: testUserId,
-      includeHistory: true,
+      context: {
+        userId: testUserId,
+        includeHistory: true,
+      },
+      runtimeContext: { get: () => undefined, set: () => {}, registry: new Map() } as any
     });
 
     console.log("🏞️  圃場数:", fieldResult.fields.length);
@@ -141,10 +148,14 @@ async function testRealData() {
     // 4. 記録検索ツールのテスト
     console.log("4️⃣ 記録検索ツール実テスト");
     const searchResult = await getDailyRecordsTool.execute({
-      userId: testUserId,
-      query: "防除",
-      includeAnalysis: true,
-      limit: 5,
+      context: {
+        userId: testUserId,
+        workType: "防除",
+        includeAnalysis: true,
+        allowMockData: false,
+        limit: 5,
+      },
+      runtimeContext: { get: () => undefined, set: () => {}, registry: new Map() } as any
     });
 
     console.log("🔍 検索結果数:", searchResult.totalRecords);
