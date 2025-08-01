@@ -1,5 +1,7 @@
 import { createTool } from "@mastra/core";
 import { z } from "zod";
+import { ToolExecutionParams, WeatherToolContext } from "../../types";
+import { ErrorHandler } from "../../services/error-handler";
 
 /**
  * 天気に基づく農作業推奨事項を生成
@@ -46,7 +48,7 @@ export const getExternalWeatherTool = createTool({
     try {
       // TODO: 実際の天気APIを統合（OpenWeatherMap, WeatherAPI等）
       // 現段階ではモックデータを返す
-      const mockForecast = Array.from({ length: days }, (_, i) => {
+      const mockForecast = Array.from({ length: days || 3 }, (_, i) => {
         const date = new Date();
         date.setDate(date.getDate() + i);
         
@@ -77,7 +79,9 @@ export const getExternalWeatherTool = createTool({
         summary,
       };
     } catch (error) {
-      throw new Error(`天気情報の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+      const appError = ErrorHandler.handleAgentError(error, 'WeatherTool', 'getExternalWeather');
+      ErrorHandler.logError(appError, { location, days });
+      throw appError;
     }
   },
 });

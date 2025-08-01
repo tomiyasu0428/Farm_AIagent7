@@ -19,15 +19,20 @@ export class AppConfig {
   } as const;
 
   // ===========================================
-  // Gemini関連設定
+  // AI関連設定（Gemini）
   // ===========================================
-  static readonly GEMINI = {
-    MODEL: 'models/gemini-2.5-flash',
-    MAX_TOKENS: 8000,
-    TEMPERATURE: 0.7,
-    TOP_P: 0.9,
-    TOP_K: 40,
+  static readonly AI = {
+    GEMINI: {
+      MODEL: 'models/gemini-2.5-flash',
+      MAX_TOKENS: 8000,
+      TEMPERATURE: 0.7,
+      TOP_P: 0.9,
+      TOP_K: 40,
+    },
   } as const;
+
+  // Backward compatibility
+  static readonly GEMINI = AppConfig.AI.GEMINI;
 
   // ===========================================
   // データベース関連設定
@@ -236,8 +241,8 @@ export class AppConfig {
   static getGeminiConfig() {
     return {
       apiKey: this.getRequiredEnvVar('GOOGLE_API_KEY'),
-      model: this.GEMINI.MODEL,
-      maxTokens: this.GEMINI.MAX_TOKENS,
+      model: this.AI.GEMINI.MODEL,
+      maxTokens: this.AI.GEMINI.MAX_TOKENS,
     };
   }
 
@@ -247,7 +252,7 @@ export class AppConfig {
   static dumpConfig(): Record<string, unknown> {
     return {
       embedding: this.EMBEDDING,
-      gemini: this.GEMINI,
+      ai: this.AI,
       database: this.DATABASE,
       search: this.SEARCH,
       line: this.LINE,

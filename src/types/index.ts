@@ -5,6 +5,9 @@
 
 import { ObjectId, Document } from 'mongodb';
 
+// Agent context types
+export * from './agent-context';
+
 // ===========================================
 // 基本型定義
 // ===========================================

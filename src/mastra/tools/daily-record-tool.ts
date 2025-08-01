@@ -9,9 +9,13 @@ import {
   GetDailyRecordsInput,
   GetDailyRecordsOutput,
   DailyWorkDocument,
-  PersonalKnowledgeDocument
+  PersonalKnowledgeDocument,
+  ToolExecutionParams,
+  DailyRecordToolContext,
+  RecordSearchToolContext
 } from "../../types";
 import { AppConfig } from "../../config";
+import { ErrorHandler, ErrorCategory, ErrorLevel } from "../../services/error-handler";
 
 /**
  * 日々の作業記録書き込みツール
@@ -244,10 +248,13 @@ export const recordDailyWorkTool = createTool({
         relatedRecords: relatedRecordsFormatted,
       };
     } catch (error) {
+      const appError = ErrorHandler.handleDatabaseError(error, 'recordDailyWork', userId);
+      ErrorHandler.logError(appError, { userId, fieldId, workType: workRecord.workType });
+      
       return {
         recordId: "",
         status: "failed" as const,
-        message: `記録の保存に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+        message: appError.message,
         learnings: [],
         recommendations: [],
       };
@@ -458,7 +465,9 @@ export const getDailyRecordsTool = createTool({
         recommendations,
       };
     } catch (error) {
-      throw new Error(`記録の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+      const appError = ErrorHandler.handleDatabaseError(error, 'getDailyRecords', userId);
+      ErrorHandler.logError(appError, { userId, fieldId, workType });
+      throw appError;
     }
   },
 });

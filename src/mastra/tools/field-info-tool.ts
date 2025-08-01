@@ -1,5 +1,7 @@
 import { createTool } from "@mastra/core";
 import { z } from "zod";
+import { ToolExecutionParams, FieldInfoToolContext } from "../../types";
+import { ErrorHandler } from "../../services/error-handler";
 
 /**
  * 圃場情報取得ツール
@@ -243,7 +245,9 @@ export const getFieldInfoTool = createTool({
         recommendations,
       };
     } catch (error) {
-      throw new Error(`圃場情報の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+      const appError = ErrorHandler.handleDatabaseError(error, 'getFieldInfo', userId);
+      ErrorHandler.logError(appError, { userId, fieldId, includeHistory });
+      throw appError;
     }
   },
 });

@@ -76,7 +76,7 @@ async function generateEmbeddingsForExistingRecords() {
           await new Promise(resolve => setTimeout(resolve, 100));
           
         } catch (error) {
-          console.error(`❌ Failed to process record ${record.recordId}:`, error.message);
+          console.error(`❌ Failed to process record ${record.recordId}:`, error instanceof Error ? error.message : String(error));
         }
       }
       
@@ -142,7 +142,7 @@ async function testEmbeddingSearch() {
         console.log(`📊 Sample similarity score: ${similarity.toFixed(4)}`);
         
       } catch (error) {
-        console.error(`❌ Query test failed: ${error.message}`);
+        console.error(`❌ Query test failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
     

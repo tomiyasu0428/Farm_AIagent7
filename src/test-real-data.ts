@@ -90,7 +90,7 @@ async function testRealData() {
 
     // 2. 作業記録ツールのテスト
     console.log("2️⃣ 作業記録ツール実テスト");
-    const recordResult = await recordDailyWorkTool.execute({
+    const recordResult = await recordDailyWorkTool.execute!({
       context: {
         userId: testUserId,
         fieldId: testFieldId,
@@ -132,7 +132,7 @@ async function testRealData() {
 
     // 3. 圃場情報取得ツールのテスト
     console.log("3️⃣ 圃場情報取得ツール実テスト");
-    const fieldResult = await getFieldInfoTool.execute({
+    const fieldResult = await getFieldInfoTool.execute!({
       context: {
         userId: testUserId,
         includeHistory: true,
@@ -147,7 +147,7 @@ async function testRealData() {
 
     // 4. 記録検索ツールのテスト
     console.log("4️⃣ 記録検索ツール実テスト");
-    const searchResult = await getDailyRecordsTool.execute({
+    const searchResult = await getDailyRecordsTool.execute!({
       context: {
         userId: testUserId,
         workType: "防除",

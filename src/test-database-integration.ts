@@ -22,7 +22,7 @@ async function testDatabaseIntegration() {
       console.log("✅ データベース初期化完了");
       
     } catch (error) {
-      console.log("❌ MongoDB接続エラー:", error.message);
+      console.log("❌ MongoDB接続エラー:", error instanceof Error ? error.message : String(error));
       console.log("⚠️  モックモードで続行します");
     }
     console.log("");

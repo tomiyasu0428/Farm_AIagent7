@@ -1,6 +1,6 @@
-import { google } from "@ai-sdk/google";
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
+import { ModelFactory } from "../model-factory";
 
 const supervisorInstructions = `
 あなたは農業AIエージェントシステムの思考・記憶指揮者（SupervisorAgent）です。
@@ -48,7 +48,7 @@ LINE経由で農業従事者から送られてくるメッセージを分析し�
 export const supervisorAgent = new Agent({
   name: "SupervisorAgent",
   instructions: supervisorInstructions,
-  model: google("models/gemini-2.5-flash") as any,
+  model: ModelFactory.getGeminiFlash(),
   
   // Tools will be added here for agent orchestration
   tools: {
