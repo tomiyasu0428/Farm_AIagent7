@@ -274,6 +274,7 @@ export const getDailyRecordsTool = createTool({
     quality: z.enum(["excellent", "good", "fair", "poor"]).optional().describe("作業品質での絞り込み"),
     limit: z.number().min(1).max(AppConfig.SEARCH.MAX_LIMIT).default(AppConfig.SEARCH.DEFAULT_LIMIT).describe("取得件数上限"),
     includeAnalysis: z.boolean().default(true).describe("分析情報を含めるか"),
+    allowMockData: z.boolean().default(false).describe("レコードが見つからない場合にモックデータを返すか"),
   }),
   outputSchema: z.object({
     userId: z.string(),
@@ -304,7 +305,7 @@ export const getDailyRecordsTool = createTool({
     recommendations: z.array(z.string()).describe("過去の経験に基づく推奨事項"),
   }),
   execute: async (context) => {
-    const { userId, fieldId, workType, dateRange, quality, limit, includeAnalysis } = context.input;
+    const { userId, fieldId, workType, dateRange, quality, limit, includeAnalysis, allowMockData } = context.input;
     try {
       // MongoDB統合: 実際のデータベースから検索
       const { getMongoClient } = await import("../../database/mongodb-client");
@@ -334,7 +335,7 @@ export const getDailyRecordsTool = createTool({
 
       const records = searchResults.records.map(record => ({
         recordId: record.recordId,
-        fieldName: `圃場_${record.fieldId}`, // TODO: 実際の圃場名を取得
+        fieldName: `圃場_${record.fieldId}`, // フィールド名解決は後で実装
         date: record.date.toISOString().split('T')[0],
         workType: record.workType,
         description: record.description,
@@ -346,8 +347,8 @@ export const getDailyRecordsTool = createTool({
         learnings: [], // TODO: 学習ポイントを抽出
       }));
 
-      // データが少ない場合はモックデータも含める
-      if (records.length === 0) {
+      // データが少ない場合はモックデータも含める（設定に基づく）
+      if (records.length === 0 && allowMockData) {
         const mockRecords = [
         {
           recordId: "record_001",

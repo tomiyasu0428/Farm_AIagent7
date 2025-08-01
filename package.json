@@ -14,7 +14,9 @@
     "test": "tsx src/test/test-line-webhook.ts",
     "test:embeddings": "tsx src/test/test-embeddings.ts",
     "test:hybrid-search": "tsx src/test/test-hybrid-search.ts",
-    "generate:embeddings": "tsx src/scripts/generate-embeddings.ts"
+    "generate:embeddings": "tsx src/scripts/generate-embeddings.ts",
+    "setup:indexes": "tsx scripts/setup-atlas-indexes.js",
+    "test:atlas": "tsx src/test/test-atlas-setup.ts"
   },
   "repository": {
     "type": "git",

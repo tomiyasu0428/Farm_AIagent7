@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, Document } from 'mongodb';
+import { MongoClient, Db, Collection, Document, ObjectId } from 'mongodb';
 import { 
   DailyWorkDocument, 
   PersonalKnowledgeDocument, 

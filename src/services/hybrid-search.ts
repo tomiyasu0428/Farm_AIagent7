@@ -8,8 +8,22 @@ import { AppConfig } from '../config';
  * キーワード検索とベクトル検索を統合
  */
 export class HybridSearchService {
-  private mongoClient = getMongoClient();
-  private embeddingService = getEmbeddingService();
+  private mongoClient: MongoDBClient | null = null;
+  private embeddingService: EmbeddingService | null = null;
+  
+  private getClient(): MongoDBClient {
+    if (!this.mongoClient) {
+      this.mongoClient = getMongoClient();
+    }
+    return this.mongoClient;
+  }
+  
+  private getEmbeddingService(): EmbeddingService {
+    if (!this.embeddingService) {
+      this.embeddingService = getEmbeddingService();
+    }
+    return this.embeddingService;
+  }
 
   /**
    * 作業記録のハイブリッド検索

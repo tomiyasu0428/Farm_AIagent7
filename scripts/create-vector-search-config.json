@@ -1,0 +1,111 @@
+{
+  "dailyWork_vector_index": {
+    "description": "dailyWork コレクション用 Vector Search インデックス設定",
+    "database": "agri_assistant",
+    "collection": "dailyWork",
+    "indexDefinition": {
+      "fields": [
+        {
+          "type": "vector",
+          "path": "embedding",
+          "numDimensions": 1536,
+          "similarity": "cosine"
+        },
+        {
+          "type": "filter", 
+          "path": "userId"
+        },
+        {
+          "type": "filter",
+          "path": "fieldId"
+        },
+        {
+          "type": "filter", 
+          "path": "workType"
+        },
+        {
+          "type": "filter",
+          "path": "date"
+        },
+        {
+          "type": "filter",
+          "path": "result.quality"
+        }
+      ]
+    },
+    "instructions": [
+      "1. MongoDB Atlas UI にアクセス",
+      "2. クラスター → Search → Create Search Index を選択",
+      "3. 'Atlas Vector Search' を選択",
+      "4. 上記のindexDefinitionをJSON エディタにコピー",
+      "5. インデックス名: dailyWork_vector_index",
+      "6. データベース: agri_assistant", 
+      "7. コレクション: dailyWork",
+      "8. 'Next' → 'Create Search Index' で作成"
+    ]
+  },
+  "personalKnowledge_vector_index": {
+    "description": "personalKnowledge コレクション用 Vector Search インデックス設定",
+    "database": "agri_assistant", 
+    "collection": "personalKnowledge",
+    "indexDefinition": {
+      "fields": [
+        {
+          "type": "vector",
+          "path": "embedding", 
+          "numDimensions": 1536,
+          "similarity": "cosine"
+        },
+        {
+          "type": "filter",
+          "path": "userId"
+        },
+        {
+          "type": "filter",
+          "path": "farmId"
+        },
+        {
+          "type": "filter",
+          "path": "category"
+        },
+        {
+          "type": "filter", 
+          "path": "confidence"
+        }
+      ]
+    },
+    "instructions": [
+      "1. MongoDB Atlas UI で2つ目のVector Searchインデックス作成",
+      "2. インデックス名: personalKnowledge_vector_index", 
+      "3. データベース: agri_assistant",
+      "4. コレクション: personalKnowledge",
+      "5. 上記indexDefinitionを使用"
+    ]
+  },
+  "setup_commands": {
+    "description": "Vector Search設定後の確認コマンド",
+    "commands": [
+      "npm run generate:embeddings  # 既存データのベクトル化",
+      "npm run test:hybrid-search   # ハイブリッド検索テスト", 
+      "npm run test:embeddings      # エンベディングテスト",
+      "npm run webhook              # LINE Webhookサーバー起動"
+    ]
+  },
+  "troubleshooting": {
+    "インデックス作成が失敗する場合": [
+      "embeddingフィールドが存在するドキュメントがあるか確認",  
+      "ベクトル次元数が1536になっているか確認",
+      "Atlas M10以上のクラスターを使用しているか確認"
+    ],
+    "検索結果が返らない場合": [
+      "インデックスが'Active'状態になっているか確認",
+      "フィルター条件が正しく設定されているか確認",
+      "numCandidatesをlimitの5-10倍に設定"
+    ],
+    "パフォーマンスが悪い場合": [
+      "numCandidatesを調整（デフォルト: limit * 5）",
+      "フィルター条件を活用して検索範囲を限定",
+      "不要なフィールドのインデックスを削除"
+    ]
+  }
+}
