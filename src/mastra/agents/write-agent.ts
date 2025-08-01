@@ -1,6 +1,6 @@
-import { google } from "@ai-sdk/google";
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
+import { ModelFactory } from "../model-factory";
 import { recordDailyWorkTool } from "../tools";
 
 const writeAgentInstructions = `
@@ -50,7 +50,7 @@ const writeAgentInstructions = `
 export const writeAgent = new Agent({
   name: "WriteAgent",
   instructions: writeAgentInstructions, 
-  model: google("models/gemini-2.5-flash") as any,
+  model: ModelFactory.getGeminiFlash(),
   
   tools: {
     // 日々の作業記録・経験蓄積

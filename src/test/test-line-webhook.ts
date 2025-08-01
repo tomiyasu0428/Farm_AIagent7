@@ -64,7 +64,7 @@ async function testLineWebhookIntegration() {
       await mongoClient.getCollection('personalKnowledge').insertMany(testDataSet.knowledge);
       console.log('✅ Test data inserted into database');
     } catch (error) {
-      console.log(`⚠️  Test data insertion failed: ${error.message}`);
+      console.log(`⚠️  Test data insertion failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     
     // 4. LINE Webhookサーバー初期化テスト
@@ -74,9 +74,9 @@ async function testLineWebhookIntegration() {
       server = new LineWebhookServer();
       console.log('✅ LINE Webhook Server created successfully');
     } catch (error) {
-      console.log(`❌ Server initialization failed: ${error.message}`);
+      console.log(`❌ Server initialization failed: ${error instanceof Error ? error.message : String(error)}`);
       
-      if (error.message.includes('Missing required environment variables')) {
+      if (error instanceof Error && error.message.includes('Missing required environment variables')) {
         console.log('   This is expected in test environment without real LINE credentials');
         return true; // テスト環境では正常
       }

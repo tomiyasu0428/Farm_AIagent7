@@ -1,6 +1,6 @@
-import { google } from "@ai-sdk/google";
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
+import { ModelFactory } from "../model-factory";
 import { getExternalWeatherTool, getFieldInfoTool, getDailyRecordsTool } from "../tools";
 
 const readAgentInstructions = `
@@ -43,7 +43,7 @@ const readAgentInstructions = `
 export const readAgent = new Agent({
   name: "ReadAgent", 
   instructions: readAgentInstructions,
-  model: google("models/gemini-2.5-flash") as any,
+  model: ModelFactory.getGeminiFlash(),
   
   tools: {
     // 天気情報取得

@@ -105,7 +105,7 @@ async function checkIndexesStatus(mongoClient: any) {
       }
       
     } catch (error) {
-      console.log(`❌ ${name} インデックス確認エラー:`, error.message);
+      console.log(`❌ ${name} インデックス確認エラー:`, error instanceof Error ? error.message : String(error));
     }
   }
 }
@@ -144,7 +144,7 @@ async function checkEmbeddingStatus(mongoClient: any) {
       }
       
     } catch (error) {
-      console.log(`❌ ${collectionName} エンベディング確認エラー:`, error.message);
+      console.log(`❌ ${collectionName} エンベディング確認エラー:`, error instanceof Error ? error.message : String(error));
     }
   }
 }
@@ -168,7 +168,7 @@ async function checkVectorSearchReadiness(mongoClient: any) {
       console.log('   推奨アクション: npm run generate:embeddings');
     }
   } catch (error) {
-    console.log('❌ エンベディングデータ確認エラー:', error.message);
+    console.log('❌ エンベディングデータ確認エラー:', error instanceof Error ? error.message : String(error));
   }
   
   // 2. Vector Searchインデックス設定ガイド
