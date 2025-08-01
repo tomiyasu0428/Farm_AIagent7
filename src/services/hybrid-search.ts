@@ -32,12 +32,30 @@ export class HybridSearchService {
       }
 
       // 1. キーワード検索
-      const keywordResults = await collection.find({
-        ...baseFilter,
-        $text: { $search: query }
-      }, {
-        score: { $meta: 'textScore' }
-      }).sort({ score: { $meta: 'textScore' } }).limit(limit * 2).toArray();
+      let keywordResults: DailyWorkDocument[] = [];
+      try {
+        keywordResults = await collection.find({
+          ...baseFilter,
+          $text: { $search: query }
+        }, {
+          score: { $meta: 'textScore' }
+        }).sort({ score: { $meta: 'textScore' } }).limit(limit * 2).toArray();
+      } catch (error: any) {
+        if (error.code === 27 || error.codeName === 'IndexNotFound') {
+          console.warn('⚠️  Text index not found, falling back to basic text search');
+          // フォールバック: 基本的な正規表現検索
+          keywordResults = await collection.find({
+            ...baseFilter,
+            $or: [
+              { description: { $regex: query, $options: 'i' } },
+              { notes: { $regex: query, $options: 'i' } },
+              { textContent: { $regex: query, $options: 'i' } }
+            ]
+          }).limit(limit * 2).toArray();
+        } else {
+          throw error;
+        }
+      }
 
       // 2. ベクトル検索
       let vectorResults: DailyWorkDocument[] = [];
@@ -96,16 +114,36 @@ export class HybridSearchService {
       if (category) filter.category = category;
 
       // テキスト検索
-      const results = await collection.find({
-        ...filter,
-        $text: { $search: query }
-      }, {
-        score: { $meta: 'textScore' }
-      }).sort({ 
-        score: { $meta: 'textScore' },
-        confidence: -1,
-        lastUsed: -1 
-      }).limit(limit).toArray();
+      let results: PersonalKnowledgeDocument[] = [];
+      try {
+        results = await collection.find({
+          ...filter,
+          $text: { $search: query }
+        }, {
+          score: { $meta: 'textScore' }
+        }).sort({ 
+          score: { $meta: 'textScore' },
+          confidence: -1,
+          lastUsed: -1 
+        }).limit(limit).toArray();
+      } catch (error: any) {
+        if (error.code === 27 || error.codeName === 'IndexNotFound') {
+          console.warn('⚠️  Text index not found on personalKnowledge collection, using basic search');
+          // フォールバック: 基本的な正規表現検索
+          results = await collection.find({
+            ...filter,
+            $or: [
+              { title: { $regex: query, $options: 'i' } },
+              { content: { $regex: query, $options: 'i' } }
+            ]
+          }).sort({ 
+            confidence: -1,
+            lastUsed: -1 
+          }).limit(limit).toArray();
+        } else {
+          throw error;
+        }
+      }
 
       const avgConfidence = results.length > 0 
         ? results.reduce((sum, doc) => sum + doc.confidence, 0) / results.length 

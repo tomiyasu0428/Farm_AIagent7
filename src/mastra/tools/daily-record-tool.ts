@@ -78,6 +78,11 @@ export const recordDailyWorkTool = createTool({
       if (!mongoClient.isConnected()) {
         await mongoClient.connect();
       }
+      
+      // 接続成功を確認
+      if (!mongoClient.isConnected()) {
+        throw new Error('Failed to establish MongoDB connection');
+      }
 
       const recordId = `record_${Date.now()}_${userId.slice(-4)}`;
       
@@ -199,9 +204,14 @@ export const recordDailyWorkTool = createTool({
         const knowledgeTitle = `${workRecord.workType}作業での成功事例`;
         const knowledgeContent = `${workRecord.description} - 結果: ${result.quality}`;
         
+        // 圧場情報からfarmIdを取得
+        const fieldCollection = mongoClient.getCollection('fields');
+        const fieldDoc = await fieldCollection.findOne({ fieldId });
+        const actualFarmId = fieldDoc?.farmId || `farm_${userId.slice(-4)}`; // フォールバックとしてユーザーIDベースのfarmIdを使用
+        
         const personalKnowledgeDoc = {
           knowledgeId: `knowledge_${Date.now()}_${userId.slice(-4)}`,
-          farmId: fieldId, // TODO: 実際のfarmIdを取得
+          farmId: actualFarmId,
           userId,
           title: knowledgeTitle,
           content: knowledgeContent,
@@ -306,6 +316,11 @@ export const getDailyRecordsTool = createTool({
       if (!mongoClient.isConnected()) {
         await mongoClient.connect();
       }
+      
+      // 接続成功を確認
+      if (!mongoClient.isConnected()) {
+        throw new Error('Failed to establish MongoDB connection');
+      }
 
       // ハイブリッド検索実行
       const searchResults = await searchService.searchDailyRecords({
@@ -408,12 +423,23 @@ export const getDailyRecordsTool = createTool({
       } : undefined;
 
       // 個別農場知識からの推奨事項
-      const knowledgeSearch = await searchService.searchPersonalKnowledge({
-        userId,
-        farmId: fieldId || "default", // TODO: 実際のfarmIdを取得
-        query: workType ? `${workType} 成功` : "農作業 経験",
-        limit: 3,
-      });
+      // 個別農場知識からの推奨事項
+      let knowledgeSearch;
+      try {
+        // 圧場からfarmIdを解決
+        const fieldDoc = fieldId ? await mongoClient.getCollection('fields').findOne({ fieldId }) : null;
+        const actualFarmId = fieldDoc?.farmId || `farm_${userId.slice(-4)}`;
+        
+        knowledgeSearch = await searchService.searchPersonalKnowledge({
+          userId,
+          farmId: actualFarmId,
+          query: workType ? `${workType} 成功` : "農作業 経験",
+          limit: 3,
+        });
+      } catch (error) {
+        console.warn('⚠️  Personal knowledge search failed, using default recommendations:', error);
+        knowledgeSearch = { knowledge: [], searchMetadata: { totalFound: 0, avgConfidence: 0, categories: [] } };
+      }
 
       const recommendations = knowledgeSearch.knowledge.length > 0
         ? knowledgeSearch.knowledge.map(k => k.content.substring(0, 50) + "...")
