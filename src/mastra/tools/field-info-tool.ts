@@ -51,7 +51,7 @@ export const getFieldInfoTool = createTool({
     summary: z.string().describe("圃場全体のサマリー"),
     recommendations: z.array(z.string()).describe("現在の状況に基づく推奨事項"),
   }),
-  execute: async ({ userId, fieldId, includeHistory }) => {
+  execute: async ({ context: { userId, fieldId, includeHistory } }) => {
     try {
       // MongoDB統合: 実際のデータベースから取得
       const { getMongoClient } = await import("../../database/mongodb-client");

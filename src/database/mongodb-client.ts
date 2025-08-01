@@ -75,7 +75,7 @@ export class MongoDBClient {
     return this.connected && 
            this.client !== null && 
            this.db !== null &&
-           this.client.topology?.isConnected() === true;
+           (this.client as any).topology?.isConnected() === true;
   }
 
   /**

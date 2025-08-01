@@ -48,7 +48,7 @@ LINE経由で農業従事者から送られてくるメッセージを分析し�
 export const supervisorAgent = new Agent({
   name: "SupervisorAgent",
   instructions: supervisorInstructions,
-  model: google("models/gemini-2.5-flash"),
+  model: google("models/gemini-2.5-flash") as any,
   
   // Tools will be added here for agent orchestration
   tools: {

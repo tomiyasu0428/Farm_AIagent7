@@ -220,23 +220,25 @@ export class LineWebhookServer {
       // ユーザー情報を取得/作成
       const userInfo = await this.getOrCreateUser(userId);
       
-      // Mastra SupervisorAgent に送信
-      const agentResponse = await mastra.run({
-        agent: 'supervisorAgent',
-        input: {
-          message: messageText,
-          userId: userId,
-          lineProfile: userInfo,
-          timestamp: new Date().toISOString(),
-        }
-      });
+      // Mastra SupervisorAgent に送信 
+      const { supervisorAgent } = await import('../mastra/agents/supervisor-agent');
+      const agentResponse = await supervisorAgent.generate(
+        `ユーザーからのメッセージ: "${messageText}"
+        
+ユーザー情報:
+- ID: ${userId}
+- 名前: ${userInfo.name || 'Unknown'}
+- 農場ID: ${userInfo.farmId || 'None'}
+
+このメッセージに対して適切に応答してください。農作業の記録、質問、圃場情報の確認など、ユーザーの意図を理解して対応してください。`
+      );
 
       console.log('🤖 Agent response:', agentResponse);
 
       // LINE に応答を送信
       const replyMessage = this.formatAgentResponse(agentResponse);
       
-      if (event.replyToken) {
+      if ('replyToken' in event && event.replyToken) {
         await this.client.replyMessage(event.replyToken, {
           type: 'text',
           text: replyMessage
@@ -248,7 +250,7 @@ export class LineWebhookServer {
       console.error('❌ Message processing failed:', this.sanitizeError(error));
       
       // エラー時はシンプルなメッセージを返す
-      if (event.replyToken) {
+      if ('replyToken' in event && event.replyToken) {
         await this.client.replyMessage(event.replyToken, {
           type: 'text',
           text: '申し訳ございません。現在処理に問題が発生しています。しばらく経ってから再度お試しください。'
@@ -285,7 +287,7 @@ export class LineWebhookServer {
 
 何でもお気軽にお話しください！`;
 
-      if (event.replyToken) {
+      if ('replyToken' in event && event.replyToken) {
         await this.client.replyMessage(event.replyToken, {
           type: 'text',
           text: welcomeMessage
@@ -346,10 +348,10 @@ export class LineWebhookServer {
           updatedAt: new Date()
         };
 
-        await usersCollection.insertOne(newUser);
+        const insertResult = await usersCollection.insertOne(newUser);
         console.log(`✅ Created new user: ${newUser.userId}`);
         
-        user = newUser;
+        user = { ...newUser, _id: insertResult.insertedId };
       } else {
         // 最終アクティブ時刻を更新
         await usersCollection.updateOne(

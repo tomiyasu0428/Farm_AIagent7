@@ -43,7 +43,7 @@ const readAgentInstructions = `
 export const readAgent = new Agent({
   name: "ReadAgent", 
   instructions: readAgentInstructions,
-  model: google("models/gemini-2.5-flash"),
+  model: google("models/gemini-2.5-flash") as any,
   
   tools: {
     // 天気情報取得

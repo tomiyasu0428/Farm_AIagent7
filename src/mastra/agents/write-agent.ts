@@ -50,7 +50,7 @@ const writeAgentInstructions = `
 export const writeAgent = new Agent({
   name: "WriteAgent",
   instructions: writeAgentInstructions, 
-  model: google("models/gemini-2.5-flash"),
+  model: google("models/gemini-2.5-flash") as any,
   
   tools: {
     // 日々の作業記録・経験蓄積

@@ -100,7 +100,7 @@ async function testLineWebhookIntegration() {
     return true;
     
   } catch (error) {
-    console.error('❌ LINE Webhook integration test failed:', error);
+    console.error('❌ LINE Webhook integration test failed:', error instanceof Error ? error.message : String(error));
     return false;
   } finally {
     if (server) {

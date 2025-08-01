@@ -7,7 +7,7 @@ async function main() {
     // Test direct agent access
     console.log("🔍 Testing direct agent usage...");
     
-    const { supervisorAgent, readAgent, writeAgent } = await import("./mastra/agents/supervisor-agent");
+    const { supervisorAgent, readAgent, writeAgent } = await import("./mastra/agents");
     console.log("🔍 Direct import test - supervisorAgent:", !!supervisorAgent);
     
     // Test agent generate method

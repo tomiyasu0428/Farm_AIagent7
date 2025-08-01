@@ -64,8 +64,7 @@ export const recordDailyWorkTool = createTool({
       similarity: z.string(),
     })).optional().describe("類似した過去の記録"),
   }),
-  execute: async (context) => {
-    const { userId, fieldId, workRecord, result, followUpNeeded, nextActions } = context.input;
+  execute: async ({ context: { userId, fieldId, workRecord, result, followUpNeeded, nextActions } }) => {
     try {
       // MongoDB統合: 実際のデータベースに保存
       const { getMongoClient } = await import("../../database/mongodb-client");
@@ -304,8 +303,7 @@ export const getDailyRecordsTool = createTool({
     }).optional(),
     recommendations: z.array(z.string()).describe("過去の経験に基づく推奨事項"),
   }),
-  execute: async (context) => {
-    const { userId, fieldId, workType, dateRange, quality, limit, includeAnalysis, allowMockData } = context.input;
+  execute: async ({ context: { userId, fieldId, workType, dateRange, quality, limit, includeAnalysis, allowMockData } }) => {
     try {
       // MongoDB統合: 実際のデータベースから検索
       const { getMongoClient } = await import("../../database/mongodb-client");
@@ -329,7 +327,10 @@ export const getDailyRecordsTool = createTool({
         query: workType ? `${workType} 作業` : "農作業 記録",
         fieldId,
         workType,
-        dateRange,
+        dateRange: dateRange ? {
+          start: new Date(dateRange.start),
+          end: new Date(dateRange.end)
+        } : undefined,
         limit,
       });
 

@@ -5,7 +5,7 @@ import { z } from "zod";
  * 天気に基づく農作業推奨事項を生成
  */
 function generateWeatherRecommendation(weather: string, isToday: boolean): string {
-  const recommendations = {
+  const recommendations: Record<string, string> = {
     "晴れ": isToday ? "散布作業に適した天候です" : "農作業に最適な天候が予想されます",
     "曇り": isToday ? "穏やかな作業日和です" : "安定した天候で作業しやすいでしょう", 
     "雨": isToday ? "屋外作業は避けてください" : "雨天のため屋内作業をお勧めします",
@@ -42,7 +42,7 @@ export const getExternalWeatherTool = createTool({
     })),
     summary: z.string().describe("全体的な天候サマリーと農作業への影響"),
   }),
-  execute: async ({ location, days }) => {
+  execute: async ({ context: { location, days } }) => {
     try {
       // TODO: 実際の天気APIを統合（OpenWeatherMap, WeatherAPI等）
       // 現段階ではモックデータを返す

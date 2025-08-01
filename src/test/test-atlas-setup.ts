@@ -37,7 +37,7 @@ async function testAtlasSetup() {
     return true;
     
   } catch (error) {
-    console.error('❌ Atlas設定テスト失敗:', error);
+    console.error('❌ Atlas設定テスト失敗:', error instanceof Error ? error.message : String(error));
     return false;
   } finally {
     await mongoClient.disconnect();

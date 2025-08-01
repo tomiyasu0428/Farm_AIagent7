@@ -1,4 +1,4 @@
-import { getMongoClient } from '../database/mongodb-client';
+import { getMongoClient, MongoDBClient } from '../database/mongodb-client';
 import { DailyWorkDocument, PersonalKnowledgeDocument, HybridSearchParams, PersonalKnowledgeSearchParams, SearchResult, PersonalKnowledgeSearchResult } from '../types';
 import { getEmbeddingService, EmbeddingService } from './embedding-service';
 import { AppConfig } from '../config';
@@ -8,14 +8,14 @@ import { AppConfig } from '../config';
  * キーワード検索とベクトル検索を統合
  */
 export class HybridSearchService {
-  private mongoClient: MongoDBClient | null = null;
+  private client: MongoDBClient | null = null;
   private embeddingService: EmbeddingService | null = null;
   
   private getClient(): MongoDBClient {
-    if (!this.mongoClient) {
-      this.mongoClient = getMongoClient();
+    if (!this.client) {
+      this.client = getMongoClient();
     }
-    return this.mongoClient;
+    return this.client;
   }
   
   private getEmbeddingService(): EmbeddingService {
@@ -32,7 +32,7 @@ export class HybridSearchService {
     const { userId, query, fieldId, workType, dateRange, limit = AppConfig.SEARCH.DEFAULT_LIMIT } = params;
     
     try {
-      const collection = this.mongoClient.getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
+      const collection = this.getClient().getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
       
       // 基本フィルター条件
       const baseFilter: Record<string, unknown> = { userId };
@@ -51,9 +51,9 @@ export class HybridSearchService {
         keywordResults = await collection.find({
           ...baseFilter,
           $text: { $search: query }
-        }, {
+        }).project({
           score: { $meta: 'textScore' }
-        }).sort({ score: { $meta: 'textScore' } }).limit(limit * 2).toArray();
+        }).sort({ score: { $meta: 'textScore' } }).limit(limit * 2).toArray() as DailyWorkDocument[];
       } catch (error: any) {
         if (error.code === 27 || error.codeName === 'IndexNotFound') {
           console.warn('⚠️  Text index not found, falling back to basic text search');
@@ -76,7 +76,7 @@ export class HybridSearchService {
       try {
         vectorResults = await this.vectorSearchDailyWork(query, baseFilter, limit);
       } catch (error) {
-        console.log('⚠️  Vector search not available, using keyword search only:', error.message);
+        console.log('⚠️  Vector search not available, using keyword search only:', error instanceof Error ? error.message : String(error));
       }
 
       // 3. 結果統合（ハイブリッド検索）
@@ -118,7 +118,7 @@ export class HybridSearchService {
     const { userId, farmId, query, category, minConfidence = AppConfig.SEARCH.MIN_CONFIDENCE, limit = 5 } = params;
     
     try {
-      const collection = this.mongoClient.getCollection<PersonalKnowledgeDocument>(AppConfig.DATABASE.COLLECTIONS.PERSONAL_KNOWLEDGE);
+      const collection = this.getClient().getCollection<PersonalKnowledgeDocument>(AppConfig.DATABASE.COLLECTIONS.PERSONAL_KNOWLEDGE);
       
       const filter: Record<string, unknown> = { 
         farmId, 
@@ -133,13 +133,13 @@ export class HybridSearchService {
         results = await collection.find({
           ...filter,
           $text: { $search: query }
-        }, {
+        }).project({
           score: { $meta: 'textScore' }
         }).sort({ 
           score: { $meta: 'textScore' },
           confidence: -1,
           lastUsed: -1 
-        }).limit(limit).toArray();
+        }).limit(limit).toArray() as PersonalKnowledgeDocument[];
       } catch (error: any) {
         if (error.code === 27 || error.codeName === 'IndexNotFound') {
           console.warn('⚠️  Text index not found on personalKnowledge collection, using basic search');
@@ -241,13 +241,13 @@ export class HybridSearchService {
     try {
       // クエリをベクトル化（検索クエリ用のタスクタイプを使用）
       const optimizedQuery = EmbeddingService.optimizeTextForEmbedding(query);
-      const queryVector = await this.embeddingService.generateEmbedding(
+      const queryVector = await this.getEmbeddingService().generateEmbedding(
         optimizedQuery, 
         AppConfig.EMBEDDING.DEFAULT_DIMENSIONS, 
         'RETRIEVAL_QUERY'
       );
 
-      const collection = this.mongoClient.getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
+      const collection = this.getClient().getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
 
       // MongoDB Atlas Vector Search
       // 注意: Atlas Vector Searchインデックスが設定されている必要があります
@@ -272,7 +272,7 @@ export class HybridSearchService {
       return vectorResults as DailyWorkDocument[];
 
     } catch (error) {
-      console.log('Vector search failed, falling back to keyword search:', error.message);
+      console.log('Vector search failed, falling back to keyword search:', error instanceof Error ? error.message : String(error));
       return [];
     }
   }
@@ -281,7 +281,7 @@ export class HybridSearchService {
    * クエリからベクトル埋め込みを生成
    */
   private async generateEmbedding(text: string): Promise<number[]> {
-    return await this.embeddingService.generateEmbedding(
+    return await this.getEmbeddingService().generateEmbedding(
       text, 
       AppConfig.EMBEDDING.DEFAULT_DIMENSIONS, 
       'RETRIEVAL_QUERY'
@@ -299,7 +299,7 @@ export class HybridSearchService {
     const { userId, referenceRecordId, limit = 3 } = params;
     
     try {
-      const collection = this.mongoClient.getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
+      const collection = this.getClient().getCollection<DailyWorkDocument>(AppConfig.DATABASE.COLLECTIONS.DAILY_WORK);
       
       // 参照記録を取得
       const referenceRecord = await collection.findOne({ 
