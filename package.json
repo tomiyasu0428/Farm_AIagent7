@@ -11,12 +11,18 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "webhook": "tsx src/line/webhook-server.ts",
+    "webhook:debug": "tsx src/line/webhook-server-debug.ts",
+    "debug": "DEBUG=mastra:* tsx src/line/webhook-server-debug.ts",
     "test": "tsx src/test/test-line-webhook.ts",
     "test:embeddings": "tsx src/test/test-embeddings.ts",
     "test:hybrid-search": "tsx src/test/test-hybrid-search.ts",
     "generate:embeddings": "tsx src/scripts/generate-embeddings.ts",
     "setup:indexes": "tsx scripts/setup-atlas-indexes.js",
-    "test:atlas": "tsx src/test/test-atlas-setup.ts"
+    "test:atlas": "tsx src/test/test-atlas-setup.ts",
+    "test:e2e": "tsx src/test/end-to-end-simple.ts",
+    "test:local": "tsx src/test/test-local-webhook.ts",
+    "test:local:suite": "tsx src/test/test-local-webhook.ts --suite",
+    "test:local:perf": "tsx src/test/test-local-webhook.ts --performance"
   },
   "repository": {
     "type": "git",
@@ -31,7 +37,7 @@
   },
   "homepage": "https://github.com/tomiyasu0428/Farm_AIagent7#readme",
   "dependencies": {
-    "@ai-sdk/google": "^2.0.0",
+    "@ai-sdk/google": "^1.2.22",
     "@google/generative-ai": "^0.24.1",
     "@line/bot-sdk": "^10.0.0",
     "@mastra/core": "^0.12.0",
@@ -43,6 +49,7 @@
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "mongodb": "^6.18.0",
+    "node-fetch": "^3.3.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -50,6 +57,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.1.0",
+    "@types/node-fetch": "^2.6.11",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }

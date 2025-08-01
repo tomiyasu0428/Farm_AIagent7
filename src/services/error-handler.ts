@@ -149,7 +149,9 @@ export class ErrorHandler {
    * データベースエラーを適切に処理
    */
   static handleDatabaseError(error: unknown, operation: string, userId?: string): AppError {
-    const sanitizedMessage = this.sanitizeError(error as Error).message;
+    // 安全な型キャスト
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    const sanitizedMessage = this.sanitizeError(errorObj).message;
     
     if (sanitizedMessage.includes('duplicate key')) {
       return new AppError(
@@ -187,7 +189,9 @@ export class ErrorHandler {
    * Mastraエージェントエラーを適切に処理
    */
   static handleAgentError(error: unknown, agentName: string, operation: string, userId?: string): AppError {
-    const sanitizedMessage = this.sanitizeError(error as Error).message;
+    // 安全な型キャスト
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    const sanitizedMessage = this.sanitizeError(errorObj).message;
     
     return new AppError(
       `Agent ${agentName} operation failed: ${operation}`,
@@ -203,7 +207,9 @@ export class ErrorHandler {
    * エンベディング生成エラーを適切に処理
    */
   static handleEmbeddingError(error: unknown, text: string, userId?: string): AppError {
-    const sanitizedMessage = this.sanitizeError(error as Error).message;
+    // 安全な型キャスト
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    const sanitizedMessage = this.sanitizeError(errorObj).message;
     
     return new AppError(
       'Embedding generation failed',
@@ -219,7 +225,9 @@ export class ErrorHandler {
    * LINEメッセージ処理エラーを適切に処理
    */
   static handleLineError(error: unknown, messageType: string, userId?: string): AppError {
-    const sanitizedMessage = this.sanitizeError(error as Error).message;
+    // 安全な型キャスト
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    const sanitizedMessage = this.sanitizeError(errorObj).message;
     
     return new AppError(
       `LINE message processing failed: ${messageType}`,
@@ -233,8 +241,14 @@ export class ErrorHandler {
 
   /**
    * エラーから機密情報を除去
+   * 安全なエラー処理とユーザーフレンドリーなメッセージを提供
    */
   private static sanitizeError(error: Error): { message: string; stack?: string } {
+    // 入力検証
+    if (!error || typeof error !== 'object') {
+      return { message: 'Unknown error occurred' };
+    }
+    
     let message = error.message || 'Unknown error occurred';
     let stack = error.stack;
 
@@ -254,11 +268,22 @@ export class ErrorHandler {
       });
     });
 
-    // MongoDB接続文字列のサニタイズ
-    message = message.replace(/mongodb\+srv:\/\/[^@]+@/gi, 'mongodb+srv://***:***@');
-    if (stack) {
-      stack = stack.replace(/mongodb\+srv:\/\/[^@]+@/gi, 'mongodb+srv://***:***@');
-    }
+    // より包括的な機密情報パターンの除去
+    const sensitivePatterns = [
+      /mongodb\+srv:\/\/[^@\/\s]+@/gi,           // MongoDB接続文字列
+      /postgresql:\/\/[^@\/\s]+@/gi,            // PostgreSQL接続文字列
+      /mysql:\/\/[^@\/\s]+@/gi,                 // MySQL接続文字列
+      /['"]?[A-Za-z0-9_-]{32,}['"]?/g,          // APIキーらしき長い文字列
+      /Bearer\s+[A-Za-z0-9_-]+/gi,              // Bearerトークン
+      /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g // クレジットカードらしき数字
+    ];
+    
+    sensitivePatterns.forEach(pattern => {
+      message = message.replace(pattern, '***');
+      if (stack) {
+        stack = stack.replace(pattern, '***');
+      }
+    });
 
     return { message, stack };
   }
@@ -287,26 +312,36 @@ export class ErrorHandler {
 
   /**
    * ユーザーフレンドリーなエラーメッセージを生成
+   * 内部詳細を露出せず、ユーザーにとって有用な情報を提供
    */
   private static getUserFriendlyMessage(error: Error | AppError): string {
     if (error instanceof AppError) {
+      // エラーレベルに基づいたメッセージ調整
+      const isCritical = error.level === ErrorLevel.CRITICAL || error.level === ErrorLevel.HIGH;
+      const urgencyPrefix = isCritical ? '緊急: ' : '';
+      
       switch (error.category) {
         case ErrorCategory.DATABASE:
-          return 'データベースの処理中にエラーが発生しました。しばらく時間をおいて再度お試しください。';
+          return `${urgencyPrefix}データベースの処理中にエラーが発生しました。${isCritical ? '管理者にお問い合わせください。' : 'しばらく時間をおいて再度お試しください。'}`;
         case ErrorCategory.AGENT:
-          return 'AI処理中にエラーが発生しました。再度お試しください。';
+          return `${urgencyPrefix}AI処理中にエラーが発生しました。再度お試しください。`;
         case ErrorCategory.EMBEDDING:
           return 'テキスト解析中にエラーが発生しました。文章を短くして再度お試しください。';
         case ErrorCategory.LINE:
-          return 'メッセージ処理中にエラーが発生しました。再度お送りください。';
+          return 'LINEメッセージの処理中にエラーが発生しました。再度お送りください。';
         case ErrorCategory.VALIDATION:
           return '入力内容に問題があります。内容を確認して再度お試しください。';
+        case ErrorCategory.API:
+          return '外部サービスとの通信でエラーが発生しました。しばらく時間をおいて再度お試しください。';
+        case ErrorCategory.AUTHENTICATION:
+          return '認証エラーが発生しました。ログインし直してください。';
         default:
-          return 'システムエラーが発生しました。しばらく時間をおいて再度お試しください。';
+          return `${urgencyPrefix}システムエラーが発生しました。${isCritical ? '管理者にお問い合わせください。' : 'しばらく時間をおいて再度お試しください。'}`;
       }
     }
     
-    return 'システムエラーが発生しました。しばらく時間をおいて再度お試しください。';
+    // AppErrorではない一般的なエラーの場合
+    return '予期しないエラーが発生しました。しばらく時間をおいて再度お試しください。';
   }
 
   /**

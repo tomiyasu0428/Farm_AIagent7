@@ -1,5 +1,4 @@
 import { google } from "@ai-sdk/google";
-import { LanguageModelV1 } from "@ai-sdk/provider";
 import { AppConfig } from "../config";
 
 /**
@@ -12,7 +11,13 @@ export class ModelFactory {
    * エージェント用に適切に型付けされたモデルを返す
    */
   static getGeminiFlash(): any {
-    return google(AppConfig.AI.GEMINI.MODEL) as any;
+    // 設定検証を実行
+    if (!this.validateModelConfig()) {
+      throw new Error('Invalid model configuration. Please check your Gemini API settings.');
+    }
+    
+    const model = google(AppConfig.AI.GEMINI.MODEL);
+    return model as any;
   }
 
   /**
@@ -20,10 +25,30 @@ export class ModelFactory {
    */
   static validateModelConfig(): boolean {
     try {
-      const model = google(AppConfig.AI.GEMINI.MODEL);
-      return !!model;
+      // 1. モデル名の存在確認
+      const modelName = AppConfig.AI.GEMINI.MODEL;
+      if (!modelName || typeof modelName !== 'string') {
+        console.error('❌ Invalid model name configuration');
+        return false;
+      }
+      
+      // 2. API キーの存在確認
+      const apiKey = AppConfig.getGeminiConfig().apiKey;
+      if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
+        console.error('❌ Missing or invalid Google API key');
+        return false;
+      }
+      
+      // 3. モデルインスタンス生成テスト
+      const model = google(modelName);
+      if (!model) {
+        console.error('❌ Failed to create model instance');
+        return false;
+      }
+      
+      return true;
     } catch (error) {
-      console.error('❌ Model configuration validation failed:', error);
+      console.error('❌ Model configuration validation failed:', error instanceof Error ? error.message : String(error));
       return false;
     }
   }
