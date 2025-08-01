@@ -1,6 +1,7 @@
-import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
+import { getExternalWeatherTool, getFieldInfoTool, getDailyRecordsTool } from "../tools";
 
 const readAgentInstructions = `
 あなたは個別農場特化型の情報分析エージェント（ReadAgent）です。
@@ -42,13 +43,15 @@ const readAgentInstructions = `
 export const readAgent = new Agent({
   name: "ReadAgent", 
   instructions: readAgentInstructions,
-  model: openai("gpt-4o"),
+  model: google("models/gemini-2.5-flash"),
   
   tools: {
-    // queryKnowledgeBase: queryKnowledgeBaseTool,
-    // getWeatherInfo: getWeatherInfoTool,
-    // getFieldInfo: getFieldInfoTool,
-    // getTaskSchedule: getTaskScheduleTool,
+    // 天気情報取得
+    getExternalWeather: getExternalWeatherTool,
+    // 圃場情報取得
+    getFieldInfo: getFieldInfoTool,
+    // 過去の記録参照
+    getDailyRecords: getDailyRecordsTool,
   },
 });
 
