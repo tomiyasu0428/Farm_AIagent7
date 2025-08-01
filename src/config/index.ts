@@ -23,7 +23,7 @@ export class AppConfig {
   // ===========================================
   static readonly AI = {
     GEMINI: {
-      MODEL: 'models/gemini-2.5-flash',
+      MODEL: 'gemini-1.5-flash',
       MAX_TOKENS: 8000,
       TEMPERATURE: 0.7,
       TOP_P: 0.9,
